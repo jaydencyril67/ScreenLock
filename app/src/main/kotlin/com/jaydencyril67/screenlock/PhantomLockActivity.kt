@@ -659,12 +659,15 @@ class PhantomLockActivity : Activity() {
             mediaChoose.text = "CHANGE LOCAL MUSIC"
             val bitmap = try {
                 val retriever = android.media.MediaMetadataRetriever()
-                retriever.setDataSource(this, Uri.parse(queue[index]))
-                val bytes = retriever.embeddedPicture
-                retriever.release()
-                if (bytes != null) {
-                    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                } else null
+                try {
+                    retriever.setDataSource(this, Uri.parse(queue[index]))
+                    val bytes = retriever.embeddedPicture
+                    if (bytes != null) {
+                        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    } else null
+                } finally {
+                    retriever.release()
+                }
             } catch (_: Exception) {
                 null
             }
