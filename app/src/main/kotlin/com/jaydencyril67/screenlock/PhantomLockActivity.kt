@@ -451,8 +451,8 @@ class PhantomLockActivity : Activity() {
             }
         )
 
-        // The fingerprint is the only object in its touch area: exactly 72dp,
-        // with no ring, tile, plate, shadow or background behind it.
+        // The fingerprint remains completely standalone, with no ring, tile,
+        // plate, shadow or background behind it.
         val sensorStack = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -472,7 +472,7 @@ class PhantomLockActivity : Activity() {
         fingerprintView = fingerprint
         sensorStack.addView(
             fingerprint,
-            LinearLayout.LayoutParams(dp(72), dp(72))
+            LinearLayout.LayoutParams(dp(68), dp(68))
         )
 
         fingerprintHint = TextView(this).apply {
@@ -499,7 +499,7 @@ class PhantomLockActivity : Activity() {
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
             ).apply {
-                bottomMargin = dp(49)
+                bottomMargin = dp(73)
             }
         )
 
