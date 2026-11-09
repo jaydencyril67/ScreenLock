@@ -7,14 +7,7 @@ import android.content.DialogInterface
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.ColorStateList
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.LinearGradient
-import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.RadialGradient
-import android.graphics.RectF
-import android.graphics.Shader
 import android.graphics.Typeface
 import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
@@ -221,7 +214,7 @@ class PhantomLockActivity : Activity() {
         }
 
         root.addView(
-            LockscreenWallpaperView(this),
+            PhantomWallpaperView(this),
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
@@ -957,108 +950,6 @@ class PhantomLockActivity : Activity() {
 
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
-
-    /**
-     * Procedural, resolution-independent wallpaper art. It stays sharp at every
-     * density and avoids depending on a flattened lockscreen screenshot.
-     */
-    private class LockscreenWallpaperView(context: Context) : View(context) {
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val density = resources.displayMetrics.density
-        private val frame = RectF()
-        private val accentPath = Path()
-
-        override fun onDraw(canvas: Canvas) {
-            super.onDraw(canvas)
-            val w = width.toFloat()
-            val h = height.toFloat()
-
-            // Matte charcoal-to-ink base with a warm copper atmosphere.
-            paint.shader = LinearGradient(
-                0f, 0f, w * 0.34f, h,
-                intArrayOf(
-                    Color.rgb(12, 11, 13),
-                    Color.rgb(22, 17, 18),
-                    Color.rgb(13, 13, 17),
-                    Color.rgb(5, 7, 10)
-                ),
-                floatArrayOf(0f, 0.38f, 0.72f, 1f),
-                Shader.TileMode.CLAMP
-            )
-            canvas.drawRect(0f, 0f, w, h, paint)
-            paint.shader = null
-
-            // A soft amber horizon replaces the previous blue glass lighting.
-            paint.shader = RadialGradient(
-                w * 0.86f, h * 0.34f, w * 0.78f,
-                intArrayOf(
-                    0x55B66A3D,
-                    0x2C83472F,
-                    0x142E2020,
-                    Color.TRANSPARENT
-                ),
-                floatArrayOf(0f, 0.32f, 0.66f, 1f),
-                Shader.TileMode.CLAMP
-            )
-            canvas.drawRect(0f, 0f, w, h, paint)
-            paint.shader = null
-
-            paint.shader = RadialGradient(
-                w * 0.08f, h * 0.78f, w * 0.9f,
-                intArrayOf(
-                    0x302E4653,
-                    0x17202A35,
-                    Color.TRANSPARENT
-                ),
-                null,
-                Shader.TileMode.CLAMP
-            )
-            canvas.drawRect(0f, 0f, w, h, paint)
-            paint.shader = null
-
-            // Fine engraved curves are part of the wallpaper, not UI surfaces.
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = density * 0.75f
-            paint.color = 0x18E7B58C
-            canvas.drawCircle(w * 0.91f, h * 0.32f, w * 0.39f, paint)
-            paint.color = 0x10E7B58C
-            canvas.drawCircle(w * 0.91f, h * 0.32f, w * 0.47f, paint)
-            paint.color = 0x0DDFD1C3
-            canvas.drawCircle(w * 0.91f, h * 0.32f, w * 0.56f, paint)
-
-            accentPath.reset()
-            accentPath.moveTo(-w * 0.12f, h * 0.58f)
-            accentPath.cubicTo(
-                w * 0.28f, h * 0.44f,
-                w * 0.56f, h * 0.64f,
-                w * 1.12f, h * 0.46f
-            )
-            paint.color = 0x12E5B28B
-            paint.strokeWidth = density * 1.15f
-            canvas.drawPath(accentPath, paint)
-            accentPath.reset()
-            accentPath.moveTo(-w * 0.1f, h * 0.63f)
-            accentPath.cubicTo(
-                w * 0.31f, h * 0.49f,
-                w * 0.64f, h * 0.7f,
-                w * 1.08f, h * 0.53f
-            )
-            paint.color = 0x0CE5B28B
-            canvas.drawPath(accentPath, paint)
-            paint.style = Paint.Style.FILL
-
-            // Keep the lower edge naturally dark behind the standalone sensor.
-            paint.shader = LinearGradient(
-                0f, h * 0.73f, 0f, h,
-                intArrayOf(Color.TRANSPARENT, 0x30030305, 0xCC030406.toInt()),
-                null,
-                Shader.TileMode.CLAMP
-            )
-            frame.set(0f, h * 0.73f, w, h)
-            canvas.drawRect(frame, paint)
-            paint.shader = null
-        }
-    }
 
     override fun onDestroy() {
         isAlive = false
