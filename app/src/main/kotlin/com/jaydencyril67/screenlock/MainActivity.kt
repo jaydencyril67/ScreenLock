@@ -64,7 +64,7 @@ class MainActivity : Activity() {
         }
         root.addView(title)
         root.addView(label(
-            "A full-screen S20-inspired lock screen that appears as your display wakes.",
+            "A full-screen S20-inspired lock screen that prepares before your display wakes.",
             13f,
             0xFFA4AEC3.toInt(),
             false
@@ -106,7 +106,7 @@ class MainActivity : Activity() {
         root.addView(protectionButton, protectParams)
 
         val note = label(
-            "HOW IT WORKS\nThe screen wakes to a custom lock screen with a large clock, date, dark wallpaper and a bold fingerprint. A small padlock silently arms one fingerprint tap; an ordinary fingerprint tap displays “Fingerprint doesn't match.” No triple tap, vibration or required phone PIN.\n\nOn phones with enrolled fingerprint hardware, Android's genuine biometric prompt is used. The Galaxy A02 has no fingerprint reader, so its armed tap is a visual unlock gesture.",
+            "HOW IT WORKS\nWhen the display goes to sleep, Phantom prepares its full-screen lock window without turning the display back on. When you wake the phone, the prepared window is already in place over the lockscreen. A screen-on launch remains as a recovery fallback.\n\nA small padlock silently arms one fingerprint tap. An ordinary fingerprint tap displays “Fingerprint doesn't match” with haptic feedback. On phones with enrolled fingerprint hardware, Android's genuine biometric prompt is used. The Galaxy A02 has no fingerprint reader, so its armed tap is a visual unlock gesture.",
             12f,
             0xFF8793AD.toInt(),
             false
@@ -150,7 +150,7 @@ class MainActivity : Activity() {
             enabled -> {
                 statusTitle.text = "Phantom protection enabled"
                 statusTitle.setTextColor(0xFF9FE6C4.toInt())
-                statusDetails.text = "Waiting for the next screen wake. Use the persistent notification's Turn off action to disable it."
+                statusDetails.text = "Phantom prepares its lock window as the display sleeps, then keeps it ready over the keyguard. The persistent notification can turn protection off."
             }
             else -> {
                 statusTitle.text = "Ready to activate"
