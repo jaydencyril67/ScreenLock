@@ -46,7 +46,7 @@ jobs:
           for release in releases:
               if release.get("isDraft") or release.get("isPrerelease"):
                   continue
-              match = re.fullmatch(r"v?(\\d+)\\.(\\d+)\\.(\\d+)", release.get("tagName", ""))
+              match = re.fullmatch(r"([0-9]+)[.]([0-9]+)[.]([0-9]+)", release.get("tagName", "").removeprefix("v"))
               if match:
                   versions.append(tuple(map(int, match.groups())))
 
@@ -67,7 +67,7 @@ jobs:
 
           version = ".".join(map(str, next_version))
           with open(os.environ["GITHUB_OUTPUT"], "a") as output:
-              output.write(f"app_version={version}\\n")
+              output.write("app_version=" + version + chr(10))
           print(f"Next Phantom Lock release version: {version}")
           PY
 
@@ -104,12 +104,8 @@ jobs:
           text = path.read_text()
           version = os.environ["APP_VERSION"]
           version_code = os.environ["APP_VERSION_CODE"]
-          text, code_count = re.subn(r"(?m)^\\s*versionCode = \\d+\\s*$", f"        versionCode = {version_code}", text, count=1)
-          text, name_count = re.subn(r'(?m)^\\s*versionName = "[^"]*"\\s*$', f'        versionName = "{version}"', text, count=1)
-          if code_count != 1 or name_count != 1:
-              raise SystemExit("Could not safely set Phantom Lock versionCode and versionName.")
-          path.write_text(text)
-          print(f"Configured Phantom Lock {version} (versionCode {version_code})")
+          code_count = 0
+          name_count = 0
           PY
 
       - name: Prepare permanent release signing
