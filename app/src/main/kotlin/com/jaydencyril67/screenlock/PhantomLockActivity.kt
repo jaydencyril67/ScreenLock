@@ -242,7 +242,7 @@ class PhantomLockActivity : Activity() {
             gravity = Gravity.START or Gravity.CENTER_VERTICAL
             includeFontPadding = false
             letterSpacing = -0.055f
-            setShadowLayer(dp(20).toFloat(), 0f, dp(4).toFloat(), 0x885D3925)
+            setShadowLayer(dp(20).toFloat(), 0f, dp(4).toFloat(), 0x885D3925.toInt())
         }
         root.addView(
             clockLabel,
