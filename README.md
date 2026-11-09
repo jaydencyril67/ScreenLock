@@ -42,6 +42,12 @@ Android and Samsung still control keyguard scheduling, battery restrictions and 
 
 The fingerprint and padlock vector drawables are based on Google Material Design Icons, distributed under the Apache License 2.0. See THIRD_PARTY_NOTICES.md. The fingerprint artwork is adapted for Phantom's larger, bolder presentation; it is not Samsung's proprietary firmware asset.
 
-## Build
+## App icon
 
-The GitHub Actions workflow builds the debug APK on each push to main. Download the screenlock-debug-apk artifact from the workflow run.
+Phantom Lock uses a dedicated charcoal-and-copper adaptive launcher icon on Android 8.0 and newer.
+
+## Build and downloads
+
+- **Normal installation:** open the repository's **Releases** page and download the `PhantomLock-x.y.z.apk` asset. This is a direct APK file; it is not an Actions ZIP.
+- **Debug/testing only:** the push workflow builds a debug APK. GitHub Actions wraps downloadable workflow artifacts in a ZIP, so do not use that ZIP as the normal release download.
+- The manual release workflow publishes the signed APK directly as a GitHub Release asset.
