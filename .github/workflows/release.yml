@@ -101,11 +101,26 @@ jobs:
           import re
 
           path = Path("app/build.gradle.kts")
-          text = path.read_text()
+          source = path.read_text()
           version = os.environ["APP_VERSION"]
           version_code = os.environ["APP_VERSION_CODE"]
+          updated = []
           code_count = 0
           name_count = 0
+          for line in source.splitlines():
+              stripped = line.strip()
+              if stripped.startswith("versionCode = "):
+                  updated.append("        versionCode = " + version_code)
+                  code_count += 1
+              elif stripped.startswith("versionName = "):
+                  updated.append("        versionName = " + chr(34) + version + chr(34))
+                  name_count += 1
+              else:
+                  updated.append(line)
+          if code_count != 1 or name_count != 1:
+              raise SystemExit("Could not safely set Phantom Lock versionCode and versionName.")
+          path.write_text(chr(10).join(updated) + chr(10))
+          print("Configured Phantom Lock " + version + " (versionCode " + version_code + ")")
           PY
 
       - name: Prepare permanent release signing
