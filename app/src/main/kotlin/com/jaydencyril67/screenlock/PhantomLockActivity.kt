@@ -682,21 +682,6 @@ class PhantomLockActivity : Activity() {
             if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) "Ⅱ" else "▶"
     }
 
-    private fun glassSurface(
-        radiusDp: Int,
-        upperColor: Int,
-        lowerColor: Int
-    ): GradientDrawable {
-        return GradientDrawable(
-            GradientDrawable.Orientation.TL_BR,
-            intArrayOf(upperColor, lowerColor)
-        ).apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = dp(radiusDp).toFloat()
-            setStroke(dp(1), 0x36FFFFFF)
-        }
-    }
-
     private fun armFingerprint() {
         // The padlock remains visually and audibly silent.
         armed = false
