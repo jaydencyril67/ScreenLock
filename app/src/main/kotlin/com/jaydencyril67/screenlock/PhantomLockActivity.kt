@@ -31,7 +31,6 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.text.SimpleDateFormat
@@ -45,6 +44,7 @@ import java.util.Locale
 class PhantomLockActivity : Activity() {
 
     companion object {
+        private const val REQUEST_CAMERA_PERMISSION = 4171
         const val ACTION_PREPARE = "com.jaydencyril67.screenlock.action.PREPARE_LOCK"
         const val ACTION_WAKE = "com.jaydencyril67.screenlock.action.WAKE_LOCK"
 
