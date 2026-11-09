@@ -2,169 +2,288 @@ package com.jaydencyril67.screenlock
 
 import android.app.Activity
 import android.app.KeyguardManager
-import android.hardware.biometrics.BiometricManager
-import android.hardware.biometrics.BiometricPrompt
+import android.content.Intent
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
-import android.os.CancellationSignal
-import android.os.Handler
-import android.os.Looper
-import android.os.VibrationEffect
-import android.os.Vibrator
+import android.provider.Settings
+import android.view.Gravity
 import android.view.View
-import android.view.WindowManager
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
+import android.widget.Toast
 
 class MainActivity : Activity() {
 
-    private lateinit var lockView: FingerprintLockView
-    private val handler = Handler(Looper.getMainLooper())
-    private var scanArmed = false
+    private lateinit var statusTitle: TextView
+    private lateinit var statusDetails: TextView
+    private lateinit var overlayButton: Button
+    private lateinit var securityButton: Button
+    private lateinit var protectionButton: Button
 
-    private val clearArmedScan = Runnable {
-        scanArmed = false
-    }
-
-    private val resetMessage = Runnable {
-        if (::lockView.isInitialized && !lockView.isAuthenticated) {
-            lockView.showStatus("TOUCH TO SCAN", "Place your finger on the glowing scanner")
-        }
+    private val prefs by lazy {
+        getSharedPreferences(PhantomOverlayService.PREFS, MODE_PRIVATE)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.statusBarColor = Color.rgb(5, 7, 15)
+        window.navigationBarColor = Color.rgb(5, 7, 15)
+        window.decorView.systemUiVisibility = 0
+        buildDashboard()
+    }
 
-        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-        window.statusBarColor = android.graphics.Color.TRANSPARENT
-        window.navigationBarColor = android.graphics.Color.BLACK
-        applyImmersiveMode()
+    override fun onResume() {
+        super.onResume()
+        if (::statusTitle.isInitialized) refreshDashboard()
+    }
 
-        lockView = FingerprintLockView(
-            context = this,
-            onKeypadTap = { armNextFingerprintTouch() },
-            onFingerprintTap = { handleFingerprintTouch() },
-            onCloseTap = { finish() }
+    private fun buildDashboard() {
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(Color.rgb(5, 7, 15))
+            isFillViewport = true
+            overScrollMode = View.OVER_SCROLL_NEVER
+        }
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(34), dp(24), dp(32))
+        }
+        scroll.addView(root)
+        setContentView(scroll)
+
+        val eyebrow = label("PHANTOM  /  SYSTEM SECURITY", 10f, 0xFF8CA7D9.toInt(), true)
+        eyebrow.letterSpacing = 0.18f
+        root.addView(eyebrow)
+
+        val title = label("Phantom Lock", 32f, Color.WHITE, false).apply {
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            setPadding(0, dp(12), 0, dp(4))
+        }
+        root.addView(title)
+        root.addView(label(
+            "A second lock layer that appears after your normal Android unlock.",
+            13f,
+            0xFFA4AEC3.toInt(),
+            false
+        ))
+
+        val statusCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(18), dp(18), dp(18))
+            background = rounded(0xFF10182A.toInt(), 20f, 0xFF273653.toInt())
+        }
+        val statusEyebrow = label("PROTECTION STATUS", 9f, 0xFF91A7D0.toInt(), true)
+        statusEyebrow.letterSpacing = 0.16f
+        statusCard.addView(statusEyebrow)
+        statusTitle = label("Checking security…", 19f, Color.WHITE, true).apply {
+            setPadding(0, dp(9), 0, dp(5))
+        }
+        statusCard.addView(statusTitle)
+        statusDetails = label("", 12f, 0xFFAAB6CE.toInt(), false)
+        statusCard.addView(statusDetails)
+        val statusParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(26) }
+        root.addView(statusCard, statusParams)
+
+        val section = label("SETUP", 10f, 0xFF8296BC.toInt(), true).apply {
+            letterSpacing = 0.18f
+            setPadding(0, dp(28), 0, dp(10))
+        }
+        root.addView(section)
+
+        overlayButton = actionButton("ALLOW DISPLAY OVER OTHER APPS", 0xFF243B63.toInt())
+        overlayButton.setOnClickListener { requestOverlayPermission() }
+        root.addView(overlayButton, buttonParams())
+
+        securityButton = actionButton("SET UP ANDROID SCREEN LOCK", 0xFF243B63.toInt())
+        securityButton.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
+        }
+        val securityParams = buttonParams().apply { topMargin = dp(10) }
+        root.addView(securityButton, securityParams)
+
+        protectionButton = actionButton("ACTIVATE PHANTOM LOCK", 0xFF526ED6.toInt())
+        protectionButton.setOnClickListener { toggleProtection() }
+        val protectParams = buttonParams().apply { topMargin = dp(18) }
+        root.addView(protectionButton, protectParams)
+
+        val note = label(
+            "HOW IT WORKS\nYour Samsung lock screen stays in place. After you unlock the phone, Phantom displays a full-screen S20-inspired layer. Triple-tap its fingerprint mark to open Android's genuine biometric or device-credential prompt.",
+            12f,
+            0xFF8793AD.toInt(),
+            false
+        ).apply {
+            setPadding(0, dp(25), 0, 0)
+            setLineSpacing(dp(5).toFloat(), 1f)
+        }
+        root.addView(note)
+
+        val foot = label(
+            "NO FAKE FINGERPRINT SCANS  •  NO CUSTOM PIN STORAGE",
+            9f,
+            0xFF596985.toInt(),
+            true
+        ).apply {
+            letterSpacing = 0.08f
+            setPadding(0, dp(24), 0, 0)
+            gravity = Gravity.CENTER
+        }
+        root.addView(foot)
+
+        refreshDashboard()
+    }
+
+    private fun refreshDashboard() {
+        val overlayGranted = Settings.canDrawOverlays(this)
+        val secure = (getSystemService(KEYGUARD_SERVICE) as KeyguardManager).isDeviceSecure
+        val enabled = prefs.getBoolean(PhantomOverlayService.PREF_ENABLED, false)
+
+        overlayButton.text = if (overlayGranted) {
+            "DISPLAY OVER OTHER APPS  ·  ALLOWED"
+        } else {
+            "ALLOW DISPLAY OVER OTHER APPS"
+        }
+        securityButton.visibility = if (secure) View.GONE else View.VISIBLE
+
+        when {
+            !overlayGranted -> {
+                statusTitle.text = "Permission needed"
+                statusTitle.setTextColor(0xFFFFCF88.toInt())
+                statusDetails.text = "Grant overlay access so the lock layer can appear over apps."
+            }
+            !secure -> {
+                statusTitle.text = "Screen lock not configured"
+                statusTitle.setTextColor(0xFFFFCF88.toInt())
+                statusDetails.text = "Set a PIN, pattern or password first. Android will verify it."
+            }
+            enabled -> {
+                statusTitle.text = "Phantom protection enabled"
+                statusTitle.setTextColor(0xFF9FE6C4.toInt())
+                statusDetails.text = "The lock layer appears after each successful device unlock. Use the notification's Turn off action to disable it."
+            }
+            else -> {
+                statusTitle.text = "Ready to protect"
+                statusTitle.setTextColor(0xFFB9C9F4.toInt())
+                statusDetails.text = "Overlay access and Android's secure screen lock are ready."
+            }
+        }
+
+        protectionButton.text = if (enabled) "TURN OFF PHANTOM LOCK" else "ACTIVATE PHANTOM LOCK"
+        protectionButton.background = rounded(
+            if (enabled) 0xFF563044.toInt() else 0xFF526ED6.toInt(),
+            18f
         )
-        setContentView(lockView)
     }
 
-    private fun applyImmersiveMode() {
-        @Suppress("DEPRECATION")
-        window.decorView.systemUiVisibility = (
-            View.SYSTEM_UI_FLAG_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-            )
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) applyImmersiveMode()
-    }
-
-    private fun armNextFingerprintTouch() {
-        handler.removeCallbacks(clearArmedScan)
-        scanArmed = true
-        // The keypad is intentionally silent and visually unchanged.
-        // Arming expires after 10 seconds and is consumed by one scan only.
-        handler.postDelayed(clearArmedScan, 10_000L)
-    }
-
-    private fun handleFingerprintTouch() {
-        if (!scanArmed) {
-            vibrate(55L)
-            lockView.showStatus(
-                "FINGERPRINT NOT MATCHED",
-                "Tap the small locked keypad to arm a scan",
-                isError = true
-            )
-            handler.removeCallbacks(resetMessage)
-            handler.postDelayed(resetMessage, 2_100L)
+    private fun requestOverlayPermission() {
+        if (Settings.canDrawOverlays(this)) {
+            Toast.makeText(this, "Overlay access is already enabled.", Toast.LENGTH_SHORT).show()
             return
         }
 
-        // Consume the hidden one-time arm before showing system authentication.
-        scanArmed = false
-        handler.removeCallbacks(clearArmedScan)
-        handler.removeCallbacks(resetMessage)
-        vibrate(28L)
-        lockView.showStatus(
-            "VERIFYING DEVICE OWNER",
-            "Complete the Android screen-lock check"
-        )
-        requestSystemCredential()
+        try {
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")
+            )
+            startActivity(intent)
+        } catch (_: Exception) {
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
+        }
     }
 
-    private fun requestSystemCredential() {
+    private fun toggleProtection() {
+        val enabled = prefs.getBoolean(PhantomOverlayService.PREF_ENABLED, false)
+        if (enabled) {
+            startService(
+                Intent(this, PhantomOverlayService::class.java)
+                    .setAction(PhantomOverlayService.ACTION_STOP)
+            )
+            Toast.makeText(this, "Phantom Lock turned off.", Toast.LENGTH_SHORT).show()
+            refreshDashboard()
+            return
+        }
+
+        if (!Settings.canDrawOverlays(this)) {
+            requestOverlayPermission()
+            return
+        }
+
         val keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
         if (!keyguard.isDeviceSecure) {
-            lockView.showStatus(
-                "SCREEN LOCK NOT SET",
-                "Set a PIN, pattern or password in Android Settings",
-                isError = true
-            )
+            Toast.makeText(
+                this,
+                "Set a PIN, pattern or password before activating Phantom Lock.",
+                Toast.LENGTH_LONG
+            ).show()
+            startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
             return
         }
 
-        try {
-            val prompt = BiometricPrompt.Builder(this)
-                .setTitle("Confirm it's you")
-                .setSubtitle("Use your phone's screen lock")
-                .setDescription("Enter your PIN, pattern or password to continue.")
-                .setAllowedAuthenticators(BiometricManager.Authenticators.DEVICE_CREDENTIAL)
-                .build()
+        val intent = Intent(this, PhantomOverlayService::class.java)
+            .setAction(PhantomOverlayService.ACTION_START)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+        Toast.makeText(this, "Phantom Lock protection activated.", Toast.LENGTH_SHORT).show()
+        finish()
+    }
 
-            prompt.authenticate(
-                CancellationSignal(),
-                mainExecutor,
-                object : BiometricPrompt.AuthenticationCallback() {
-                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                        super.onAuthenticationSucceeded(result)
-                        vibrate(90L)
-                        lockView.showAuthenticated()
-                    }
-
-                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                        super.onAuthenticationError(errorCode, errString)
-                        val message = when (errorCode) {
-                            BiometricPrompt.BIOMETRIC_ERROR_USER_CANCELED,
-                            BiometricPrompt.BIOMETRIC_ERROR_CANCELED ->
-                                "Verification cancelled. Arm another scan to try again"
-                            else ->
-                                "System verification unavailable. Try again"
-                        }
-                        lockView.showStatus("VERIFICATION NOT COMPLETED", message, isError = true)
-                    }
-                }
-            )
-        } catch (_: Exception) {
-            lockView.showStatus(
-                "SYSTEM CHECK UNAVAILABLE",
-                "Try again or check your Android screen-lock settings",
-                isError = true
-            )
+    private fun label(
+        text: String,
+        size: Float,
+        color: Int,
+        bold: Boolean
+    ) = TextView(this).apply {
+        this.text = text
+        textSize = size
+        setTextColor(color)
+        typeface = if (bold) {
+            Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        } else {
+            Typeface.create("sans-serif", Typeface.NORMAL)
         }
     }
 
-    private fun vibrate(durationMs: Long) {
-        try {
-            val vibrator = getSystemService(VIBRATOR_SERVICE) as Vibrator
-            if (vibrator.hasVibrator()) {
-                vibrator.vibrate(
-                    VibrationEffect.createOneShot(
-                        durationMs,
-                        VibrationEffect.DEFAULT_AMPLITUDE
-                    )
-                )
-            }
-        } catch (_: Exception) {
-            // Haptics are optional; the UI remains usable if unavailable.
-        }
+    private fun actionButton(text: String, color: Int) = Button(this).apply {
+        this.text = text
+        isAllCaps = false
+        textSize = 11f
+        letterSpacing = 0.04f
+        setTextColor(Color.WHITE)
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        background = rounded(color, 18f)
+        elevation = 0f
+        minHeight = dp(56)
+        minimumHeight = dp(56)
+        stateListAnimator = null
     }
 
-    override fun onDestroy() {
-        handler.removeCallbacksAndMessages(null)
-        super.onDestroy()
-    }
+    private fun rounded(color: Int, radius: Float, stroke: Int? = null) =
+        GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dp(radius)
+            setColor(color)
+            if (stroke != null) setStroke(dp(1), stroke)
+        }
+
+    private fun buttonParams() = LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        dp(56)
+    )
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
+    private fun dp(value: Float): Float =
+        value * resources.displayMetrics.density
 }
