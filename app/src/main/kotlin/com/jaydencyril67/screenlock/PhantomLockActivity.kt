@@ -880,7 +880,27 @@ class PhantomLockActivity : Activity() {
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
-        // The lock surface remains active until its armed unlock or screen-off.
+        // Back is navigation, not an authentication event. Keep Phantom visible.
+    }
+
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        if (keyCode == android.view.KeyEvent.KEYCODE_BACK) return true
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (isFinishing || isDestroyed) return
+
+        // Home and Recents background Activities. Ask the foreground service to
+        // restore Phantom; overlay permission is already required by setup.
+        try {
+            startService(Intent(this, PhantomOverlayService::class.java).apply {
+                action = PhantomOverlayService.ACTION_RESTORE_LOCK
+            })
+        } catch (_: Exception) {
+            // Protection may have been disabled while navigation was occurring.
+        }
     }
 
     private fun dp(value: Int): Int =
