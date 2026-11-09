@@ -73,7 +73,7 @@ class PhantomOverlayService : Service() {
             ACTION_START -> {
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                     .putBoolean(PREF_ENABLED, true)
-                    .apply()
+                    .commit()
             }
 
             ACTION_RESTORE_LOCK -> {
@@ -92,7 +92,7 @@ class PhantomOverlayService : Service() {
         if (!Settings.canDrawOverlays(this)) {
             getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putBoolean(PREF_ENABLED, false)
-                .apply()
+                .commit()
             stopSelf()
             return START_NOT_STICKY
         }
@@ -164,26 +164,14 @@ class PhantomOverlayService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val stopService = PendingIntent.getService(
-            this,
-            2,
-            Intent(this, PhantomOverlayService::class.java).setAction(ACTION_STOP),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentTitle("Phantom Lock is active")
-            .setContentText("Phantom prepares its lock screen before the display wakes.")
+            .setContentText("Running in the background. Open Phantom Lock to manage protection.")
             .setContentIntent(openApp)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(Notification.CATEGORY_SERVICE)
-            .addAction(
-                android.R.drawable.ic_menu_close_clear_cancel,
-                "Turn off",
-                stopService
-            )
             .build()
     }
 
@@ -194,7 +182,7 @@ class PhantomOverlayService : Service() {
                 "Phantom Lock protection",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Prepares the Phantom lock surface for each screen wake."
+                description = "Shows that Phantom Lock protection is running in the background."
                 setShowBadge(false)
             }
             (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
@@ -205,7 +193,7 @@ class PhantomOverlayService : Service() {
     private fun disableProtection() {
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
             .putBoolean(PREF_ENABLED, false)
-            .apply()
+            .commit()
 
         sendBroadcast(Intent(ACTION_CLOSE_LOCK).setPackage(packageName))
         stopForeground(true)
