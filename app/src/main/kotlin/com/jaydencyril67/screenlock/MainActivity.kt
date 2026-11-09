@@ -209,7 +209,7 @@ class MainActivity : Activity() {
     private fun notificationAccessGranted(): Boolean {
         val enabled = Settings.Secure.getString(
             contentResolver,
-            Settings.Secure.ENABLED_NOTIFICATION_LISTENERS
+            "enabled_notification_listeners"
         ).orEmpty()
 
         return enabled.split(':').any { entry ->
