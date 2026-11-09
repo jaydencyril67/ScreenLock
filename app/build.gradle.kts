@@ -15,6 +15,15 @@ android {
         versionName = "1.0.0"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(providers.gradleProperty("PHANTOM_KEYSTORE_FILE").orElse("missing.keystore").get())
+            storePassword = providers.gradleProperty("PHANTOM_KEYSTORE_PASSWORD").orElse("").get()
+            keyAlias = providers.gradleProperty("PHANTOM_KEY_ALIAS").orElse("").get()
+            keyPassword = providers.gradleProperty("PHANTOM_KEY_PASSWORD").orElse("").get()
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
@@ -22,6 +31,7 @@ android {
         }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
