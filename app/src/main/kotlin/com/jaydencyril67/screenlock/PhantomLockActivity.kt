@@ -48,6 +48,15 @@ import java.util.Locale
  */
 class PhantomLockActivity : Activity() {
 
+    companion object {
+        const val ACTION_PREPARE = "com.jaydencyril67.screenlock.action.PREPARE_LOCK"
+        const val ACTION_WAKE = "com.jaydencyril67.screenlock.action.WAKE_LOCK"
+
+        @Volatile
+        var isAlive: Boolean = false
+            private set
+    }
+
     private val handler = Handler(Looper.getMainLooper())
     private var armed = false
     private var authenticating = false
@@ -85,31 +94,50 @@ class PhantomLockActivity : Activity() {
 
     private val screenOffReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == Intent.ACTION_SCREEN_OFF ||
-                intent.action == PhantomOverlayService.ACTION_CLOSE_LOCK
-            ) {
-                armed = false
-                unlockPending = false
-                armRunnable?.let(handler::removeCallbacks)
-                finish()
+            when (intent.action) {
+                Intent.ACTION_SCREEN_OFF -> {
+                    // Keep this Activity alive underneath the sleeping display.
+                    // Its showWhenLocked window is already prepared for the next wake.
+                    armed = false
+                    unlockPending = false
+                    armRunnable?.let(handler::removeCallbacks)
+                    armRunnable = null
+                    handler.removeCallbacks(clearMismatch)
+                    if (::fingerprintHint.isInitialized) {
+                        fingerprintHint.text = "TOUCH TO UNLOCK"
+                        fingerprintHint.setTextColor(0xC9DCE9F8.toInt())
+                        fingerprintHint.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
+                    }
+                }
+
+                PhantomOverlayService.ACTION_CLOSE_LOCK -> {
+                    armed = false
+                    unlockPending = false
+                    armRunnable?.let(handler::removeCallbacks)
+                    finish()
+                }
             }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        isAlive = true
 
-        // Request the lock surface before inflating it, so the first visible frame
-        // has the best chance of appearing above Android's keyguard.
+        // Prepare mode is launched as the device goes to sleep. It must NOT wake
+        // the display; it only places this show-when-locked Activity in front so
+        // its already-created window is ready when the user wakes the phone.
+        val prepareOnly = intent?.action == ACTION_PREPARE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
-            setTurnScreenOn(true)
+            setTurnScreenOn(!prepareOnly)
         } else {
             @Suppress("DEPRECATION")
-            window.addFlags(
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-            )
+            window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
+            if (!prepareOnly) {
+                @Suppress("DEPRECATION")
+                window.addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
+            }
         }
 
         window.statusBarColor = Color.TRANSPARENT
@@ -129,6 +157,20 @@ class PhantomLockActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        val prepareOnly = intent.action == ACTION_PREPARE
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(!prepareOnly)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
+            @Suppress("DEPRECATION")
+            if (prepareOnly) {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
+            } else {
+                window.addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
+            }
+        }
         armed = false
         unlockPending = false
         authenticating = false
@@ -745,6 +787,7 @@ class PhantomLockActivity : Activity() {
     }
 
     override fun onDestroy() {
+        isAlive = false
         handler.removeCallbacksAndMessages(null)
         armRunnable = null
         if (receiverRegistered) {
