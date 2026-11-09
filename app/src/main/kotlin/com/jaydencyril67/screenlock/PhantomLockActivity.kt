@@ -3,11 +3,13 @@ package com.jaydencyril67.screenlock
 import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.hardware.camera2.CameraManager
 import android.graphics.Typeface
 import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
@@ -28,6 +30,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -61,15 +64,18 @@ class PhantomLockActivity : Activity() {
     private lateinit var dateLabel: TextView
     private lateinit var batteryLabel: TextView
     private lateinit var fingerprintHint: TextView
-    private lateinit var notificationHeading: TextView
-    private lateinit var notificationContainer: LinearLayout
     private lateinit var mediaContainer: LinearLayout
     private lateinit var mediaTitle: TextView
+    private lateinit var mediaArtwork: ImageView
     private lateinit var mediaSubtitle: TextView
     private lateinit var mediaPlayPause: TextView
     private var fingerprintView: ImageView? = null
     private var mediaController: MediaController? = null
     private var activeMediaToken: android.media.session.MediaSession.Token? = null
+    private var externalShortcutLaunched = false
+    private var flashEnabled = false
+    private var flashCameraId: String? = null
+    private lateinit var flashLabel: TextView
 
     private val mediaCallback = object : MediaController.Callback() {
         override fun onMetadataChanged(metadata: MediaMetadata?) {
@@ -91,7 +97,7 @@ class PhantomLockActivity : Activity() {
         override fun run() {
             if (::clockLabel.isInitialized) {
                 val now = Date()
-                clockLabel.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(now)
+                clockLabel.text = SimpleDateFormat("HH  :  mm", Locale.getDefault()).format(now)
                 dateLabel.text = SimpleDateFormat(
                     "EEEE  ·  d MMMM",
                     Locale.getDefault()
@@ -127,9 +133,7 @@ class PhantomLockActivity : Activity() {
                     }
                 }
 
-                PhantomNotificationData.ACTION_DATA_CHANGED -> {
-                    if (::notificationContainer.isInitialized) refreshDynamicContent()
-                }
+                PhantomNotificationData.ACTION_DATA_CHANGED -> refreshDynamicContent()
 
                 PhantomOverlayService.ACTION_CLOSE_LOCK -> {
                     armed = false
@@ -261,13 +265,13 @@ class PhantomLockActivity : Activity() {
         )
 
         clockLabel = TextView(this).apply {
-            text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-            textSize = 88f
+            text = SimpleDateFormat("HH  :  mm", Locale.getDefault()).format(Date())
+            textSize = 73f
             setTextColor(0xFFF5F1EA.toInt())
-            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+            typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
             gravity = Gravity.START or Gravity.CENTER_VERTICAL
             includeFontPadding = false
-            letterSpacing = -0.075f
+            letterSpacing = -0.045f
             setShadowLayer(dp(18).toFloat(), 0f, dp(4).toFloat(), 0x775D3925)
         }
         root.addView(
@@ -277,8 +281,8 @@ class PhantomLockActivity : Activity() {
                 dp(104),
                 Gravity.TOP or Gravity.START
             ).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.155f).toInt()
-                marginStart = dp(27)
+                topMargin = (resources.displayMetrics.heightPixels * 0.165f).toInt()
+                marginStart = dp(25)
                 marginEnd = dp(20)
             }
         )
@@ -298,9 +302,40 @@ class PhantomLockActivity : Activity() {
                 dp(28),
                 Gravity.TOP or Gravity.START
             ).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.285f).toInt()
-                marginStart = dp(31)
+                topMargin = (resources.displayMetrics.heightPixels * 0.265f).toInt()
+                marginStart = dp(29)
                 marginEnd = dp(20)
+            }
+        )
+
+        val dateRule = View(this).apply {
+            setBackgroundColor(0x70D1B38A)
+        }
+        root.addView(
+            dateRule,
+            FrameLayout.LayoutParams(dp(54), dp(1), Gravity.TOP or Gravity.START).apply {
+                topMargin = (resources.displayMetrics.heightPixels * 0.315f).toInt()
+                marginStart = dp(30)
+            }
+        )
+
+        val dateCaption = TextView(this).apply {
+            text = "YOUR DAY  ·  YOUR DEVICE"
+            textSize = 8f
+            letterSpacing = 0.19f
+            setTextColor(0xAFCFC6B8.toInt())
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            includeFontPadding = false
+        }
+        root.addView(
+            dateCaption,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                dp(20),
+                Gravity.TOP or Gravity.START
+            ).apply {
+                topMargin = (resources.displayMetrics.heightPixels * 0.325f).toInt()
+                marginStart = dp(30)
             }
         )
 
@@ -310,35 +345,6 @@ class PhantomLockActivity : Activity() {
             clipChildren = false
             clipToPadding = false
         }
-
-        notificationHeading = TextView(this).apply {
-            text = "NOTIFICATIONS"
-            textSize = 9f
-            letterSpacing = 0.2f
-            setTextColor(0xAFC7BEB0.toInt())
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            includeFontPadding = false
-            visibility = View.GONE
-        }
-        contentStack.addView(
-            notificationHeading,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(20)
-            )
-        )
-
-        notificationContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = null
-        }
-        contentStack.addView(
-            notificationContainer,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        )
 
         mediaContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -362,6 +368,22 @@ class PhantomLockActivity : Activity() {
             )
         )
 
+        val mediaMainRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        mediaArtwork = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            setBackgroundColor(0x332F3540)
+        }
+        mediaMainRow.addView(
+            mediaArtwork,
+            LinearLayout.LayoutParams(dp(58), dp(58)).apply { marginEnd = dp(13) }
+        )
+        val mediaTextColumn = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
         mediaTitle = TextView(this).apply {
             textSize = 15f
             setTextColor(0xFFF3EFE8.toInt())
@@ -370,14 +392,6 @@ class PhantomLockActivity : Activity() {
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
         }
-        mediaContainer.addView(
-            mediaTitle,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(24)
-            )
-        )
-
         mediaSubtitle = TextView(this).apply {
             textSize = 11f
             setTextColor(0xBFCAC1B7.toInt())
@@ -386,11 +400,29 @@ class PhantomLockActivity : Activity() {
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
         }
-        mediaContainer.addView(
+        mediaTextColumn.addView(
+            mediaTitle,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(25)
+            )
+        )
+        mediaTextColumn.addView(
             mediaSubtitle,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(20)
+                dp(22)
+            )
+        )
+        mediaMainRow.addView(
+            mediaTextColumn,
+            LinearLayout.LayoutParams(0, dp(58), 1f)
+        )
+        mediaContainer.addView(
+            mediaMainRow,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(62)
             )
         )
 
@@ -438,8 +470,8 @@ class PhantomLockActivity : Activity() {
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.TOP or Gravity.START
             ).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.385f).toInt()
-                marginStart = dp(31)
+                topMargin = (resources.displayMetrics.heightPixels * 0.405f).toInt()
+                marginStart = dp(29)
                 marginEnd = dp(31)
             }
         )
@@ -542,6 +574,35 @@ class PhantomLockActivity : Activity() {
             }
         )
 
+        val shortcutRow = FrameLayout(this)
+        val flashShortcut = shortcutButton("ϟ", "FLASHLIGHT") {
+            toggleFlashlight()
+        }
+        flashLabel = flashShortcut.second
+        shortcutRow.addView(
+            flashShortcut.first,
+            FrameLayout.LayoutParams(dp(78), dp(64), Gravity.BOTTOM or Gravity.START)
+        )
+        val cameraShortcut = shortcutButton("◎", "CAMERA") {
+            launchCamera()
+        }
+        shortcutRow.addView(
+            cameraShortcut.first,
+            FrameLayout.LayoutParams(dp(78), dp(64), Gravity.BOTTOM or Gravity.END)
+        )
+        root.addView(
+            shortcutRow,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                dp(70),
+                Gravity.BOTTOM
+            ).apply {
+                leftMargin = dp(25)
+                rightMargin = dp(25)
+                bottomMargin = dp(17)
+            }
+        )
+
         setContentView(root)
         updateClock()
         refreshDynamicContent()
@@ -565,112 +626,9 @@ class PhantomLockActivity : Activity() {
     }
 
     private fun refreshDynamicContent() {
-        if (!::notificationContainer.isInitialized) return
-        renderNotifications()
+        if (!::mediaContainer.isInitialized) return
         connectMediaSession()
         updateMediaContent()
-    }
-
-    private fun renderNotifications() {
-        notificationContainer.removeAllViews()
-        val items = PhantomNotificationData.notifications().take(3)
-        notificationHeading.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
-        notificationContainer.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
-
-        items.forEachIndexed { index, item ->
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, dp(6), 0, dp(8))
-                isClickable = item.contentIntent != null
-                isFocusable = item.contentIntent != null
-                if (item.contentIntent != null) {
-                    setOnClickListener {
-                        try {
-                            item.contentIntent.send()
-                        } catch (_: Exception) {
-                            // The originating app may have cancelled its PendingIntent.
-                        }
-                    }
-                }
-            }
-
-            val app = TextView(this).apply {
-                text = item.appName.uppercase(Locale.getDefault())
-                textSize = 8f
-                letterSpacing = 0.13f
-                setTextColor(0xAFC7BEB0.toInt())
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-                includeFontPadding = false
-                maxLines = 1
-            }
-            row.addView(
-                app,
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(15)
-                )
-            )
-
-            val title = TextView(this).apply {
-                text = item.title
-                textSize = 14f
-                setTextColor(0xFFF2EEE7.toInt())
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-                includeFontPadding = false
-                maxLines = 1
-                ellipsize = android.text.TextUtils.TruncateAt.END
-            }
-            row.addView(
-                title,
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(21)
-                )
-            )
-
-            if (item.message.isNotBlank()) {
-                val message = TextView(this).apply {
-                    text = item.message
-                    textSize = 11f
-                    setTextColor(0xC6D0C8BE.toInt())
-                    typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-                    includeFontPadding = false
-                    maxLines = 2
-                    ellipsize = android.text.TextUtils.TruncateAt.END
-                }
-                row.addView(
-                    message,
-                    LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    )
-                )
-            }
-
-            notificationContainer.addView(
-                row,
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-            )
-
-            if (index < items.lastIndex) {
-                val divider = View(this).apply {
-                    setBackgroundColor(0x28E7D9C8)
-                }
-                notificationContainer.addView(
-                    divider,
-                    LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        dp(1)
-                    ).apply {
-                        topMargin = dp(3)
-                    }
-                )
-            }
-        }
     }
 
     private fun connectMediaSession() {
@@ -716,8 +674,132 @@ class PhantomLockActivity : Activity() {
         mediaContainer.visibility = View.VISIBLE
         mediaTitle.text = title
         mediaSubtitle.text = artist.orEmpty()
+        val artwork = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
+            ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+        if (artwork != null) {
+            mediaArtwork.setImageBitmap(artwork)
+        } else {
+            mediaArtwork.setImageResource(R.drawable.ic_music_note)
+        }
         mediaPlayPause.text =
             if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) "Ⅱ" else "▶"
+    }
+
+    private fun shortcutButton(
+        glyph: String,
+        caption: String,
+        action: () -> Unit
+    ): Pair<View, TextView> {
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { action() }
+        }
+        val icon = TextView(this).apply {
+            text = glyph
+            textSize = 30f
+            setTextColor(0xFFF4F0E9.toInt())
+            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+        }
+        val label = TextView(this).apply {
+            text = caption
+            textSize = 8f
+            letterSpacing = 0.14f
+            setTextColor(0xC9D8D0C5.toInt())
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+        }
+        column.addView(icon, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, dp(39)
+        ))
+        column.addView(label, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, dp(17)
+        ))
+        return Pair(column, label)
+    }
+
+    private fun toggleFlashlight() {
+        val manager = getSystemService(CAMERA_SERVICE) as CameraManager
+        try {
+            val cameraId = flashCameraId ?: manager.cameraIdList.firstOrNull { id ->
+                manager.getCameraCharacteristics(id).get(
+                    android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE
+                ) == true
+            }?.also { flashCameraId = it }
+
+            if (cameraId == null) {
+                android.widget.Toast.makeText(
+                    this, "Flashlight is not available on this device.",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                return
+            }
+
+            if (checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(
+                    arrayOf(android.Manifest.permission.CAMERA),
+                    REQUEST_CAMERA_PERMISSION
+                )
+                return
+            }
+
+            flashEnabled = !flashEnabled
+            manager.setTorchMode(cameraId, flashEnabled)
+            flashLabel.text = if (flashEnabled) "FLASH ON" else "FLASHLIGHT"
+        } catch (_: SecurityException) {
+            flashEnabled = false
+            flashLabel.text = "FLASHLIGHT"
+            android.widget.Toast.makeText(
+                this, "Allow camera permission to use the flashlight.",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        } catch (_: Exception) {
+            flashEnabled = false
+            flashLabel.text = "FLASHLIGHT"
+            android.widget.Toast.makeText(
+                this, "Could not switch on the flashlight.",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_CAMERA_PERMISSION &&
+            grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+        ) {
+            toggleFlashlight()
+        }
+    }
+
+    private fun launchCamera() {
+        val cameraIntent = Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE)
+        if (cameraIntent.resolveActivity(packageManager) == null) {
+            android.widget.Toast.makeText(
+                this, "No camera app is available.",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+        externalShortcutLaunched = true
+        try {
+            startActivity(cameraIntent)
+        } catch (_: Exception) {
+            externalShortcutLaunched = false
+            android.widget.Toast.makeText(
+                this, "Could not open the camera.",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
     private fun armFingerprint() {
@@ -936,6 +1018,10 @@ class PhantomLockActivity : Activity() {
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         if (isFinishing || isDestroyed) return
+        if (externalShortcutLaunched) {
+            externalShortcutLaunched = false
+            return
+        }
 
         // Home and Recents background Activities. Ask the foreground service to
         // restore Phantom; overlay permission is already required by setup.
@@ -962,6 +1048,14 @@ class PhantomLockActivity : Activity() {
         }
         mediaController = null
         activeMediaToken = null
+        if (flashEnabled) {
+            try {
+                flashCameraId?.let {
+                    (getSystemService(CAMERA_SERVICE) as CameraManager).setTorchMode(it, false)
+                }
+            } catch (_: Exception) { }
+            flashEnabled = false
+        }
         if (receiverRegistered) {
             try {
                 unregisterReceiver(screenOffReceiver)
