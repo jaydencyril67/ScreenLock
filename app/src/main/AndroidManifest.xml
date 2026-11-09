@@ -19,7 +19,6 @@
             android:excludeFromRecents="true"
             android:exported="false"
             android:finishOnTaskLaunch="true"
-            android:noHistory="true"
             android:screenOrientation="portrait"
             android:theme="@style/AuthTransparentTheme" />
 
