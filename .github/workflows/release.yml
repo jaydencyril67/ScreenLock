@@ -126,43 +126,27 @@ jobs:
       - name: Prepare permanent release signing
         env:
           GH_TOKEN: ${{ github.token }}
+          KEYSTORE_PASSWORD: ${{ secrets.PHANTOM_KEYSTORE_PASSWORD }}
         run: |
           set -euo pipefail
-          mkdir -p signing
-          run_id="$(gh run list \
-            --workflow generate-release-keystore.yml \
-            --status success \
-            --limit 1 \
-            --json databaseId \
-            --jq '.[0].databaseId')"
-
-          if [ -z "$run_id" ]; then
-            echo "::error::No successful Phantom Lock signing-key workflow was found."
-            echo "Run 'Generate Phantom Lock Release Keystore' once before building a release."
+          if [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::Create the PHANTOM_KEYSTORE_PASSWORD Actions secret before building a release."
             exit 1
           fi
-
-          gh run download "$run_id" \
-            --name phantom-lock-release-signing-files \
-            --dir signing
-
+          mkdir -p signing
+          run_id="$(gh run list --workflow generate-release-keystore.yml --status success --limit 1 --json databaseId --jq ".[0].databaseId")"
+          if [ -z "$run_id" ]; then
+            echo "::error::No successful Phantom Lock keystore workflow was found. Run Generate Phantom Lock Release Keystore once."
+            exit 1
+          fi
+          gh run download "$run_id" --name phantom-lock-release-signing-files --dir signing
           test -s signing/phantom-lock-release.keystore
-          test -s signing/phantom-lock-signing-credentials.txt
           cp signing/phantom-lock-release.keystore app/phantom-lock-release.keystore
-
-          set -a
-          source signing/phantom-lock-signing-credentials.txt
-          set +a
-
-          test -n "${ANDROID_KEYSTORE_PASSWORD:-}"
-          test -n "${ANDROID_KEY_ALIAS:-}"
-          test -n "${ANDROID_KEY_PASSWORD:-}"
-
           cat >> gradle.properties <<EOF
           PHANTOM_KEYSTORE_FILE=phantom-lock-release.keystore
-          PHANTOM_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD
-          PHANTOM_KEY_ALIAS=$ANDROID_KEY_ALIAS
-          PHANTOM_KEY_PASSWORD=$ANDROID_KEY_PASSWORD
+          PHANTOM_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD
+          PHANTOM_KEY_ALIAS=phantomlock
+          PHANTOM_KEY_PASSWORD=$KEYSTORE_PASSWORD
           EOF
 
       - name: Build signed Phantom Lock APK
