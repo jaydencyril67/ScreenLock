@@ -10,10 +10,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
 import android.provider.Settings
+import android.util.Log
 
 class PhantomOverlayService : Service() {
 
@@ -24,44 +23,26 @@ class PhantomOverlayService : Service() {
         const val PREFS = "phantom_lock_settings"
         const val PREF_ENABLED = "protection_enabled"
 
+        private const val TAG = "PhantomLock"
         private const val CHANNEL_ID = "phantom_lock_service"
         private const val NOTIFICATION_ID = 7314
     }
 
-    private val handler = Handler(Looper.getMainLooper())
     private var screenReceiverRegistered = false
-
-    private val showLockRunnable = Runnable {
-        if (!isProtectionEnabled() || !Settings.canDrawOverlays(this)) return@Runnable
-
-        try {
-            val intent = Intent(this, PhantomLockActivity::class.java).apply {
-                addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                        Intent.FLAG_ACTIVITY_NO_ANIMATION
-                )
-            }
-            startActivity(intent)
-        } catch (_: Exception) {
-            // Keep the service alive; the next screen wake can retry.
-        }
-    }
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_SCREEN_OFF -> {
-                    handler.removeCallbacks(showLockRunnable)
+                    Log.d(TAG, "Screen off: closing Phantom lock surface")
                     sendBroadcast(Intent(ACTION_CLOSE_LOCK).setPackage(packageName))
                 }
 
                 Intent.ACTION_SCREEN_ON -> {
-                    handler.removeCallbacks(showLockRunnable)
                     if (isProtectionEnabled()) {
-                        // Let Android finish waking the display before placing our screen.
-                        handler.postDelayed(showLockRunnable, 280L)
+                        // Launch immediately from the screen-on broadcast. There is no
+                        // extra timer, so Phantom gets the earliest app-controlled frame.
+                        launchLockScreen()
                     }
                 }
             }
@@ -93,8 +74,8 @@ class PhantomOverlayService : Service() {
             return START_NOT_STICKY
         }
 
-        // Overlay permission is also the user's explicit authorization for this
-        // screen-on utility to launch its lock Activity from the background.
+        // User-granted overlay permission is the Android background-activity-launch
+        // exception used by this screen-on lock utility.
         if (!Settings.canDrawOverlays(this)) {
             getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putBoolean(PREF_ENABLED, false)
@@ -110,6 +91,25 @@ class PhantomOverlayService : Service() {
     private fun isProtectionEnabled(): Boolean =
         getSharedPreferences(PREFS, MODE_PRIVATE)
             .getBoolean(PREF_ENABLED, false)
+
+    private fun launchLockScreen() {
+        if (!isProtectionEnabled() || !Settings.canDrawOverlays(this)) return
+
+        try {
+            val intent = Intent(this, PhantomLockActivity::class.java).apply {
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_NO_ANIMATION
+                )
+            }
+            startActivity(intent)
+            Log.d(TAG, "Phantom lock launch requested immediately on SCREEN_ON")
+        } catch (error: Exception) {
+            Log.e(TAG, "Unable to launch Phantom lock screen on wake", error)
+        }
+    }
 
     private fun registerScreenReceiver() {
         val filter = IntentFilter().apply {
@@ -144,7 +144,7 @@ class PhantomOverlayService : Service() {
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentTitle("Phantom Lock is active")
-            .setContentText("Your fingerprint lock screen appears whenever the display wakes.")
+            .setContentText("Your custom lock screen appears as soon as the display wakes.")
             .setContentIntent(openApp)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -177,14 +177,12 @@ class PhantomOverlayService : Service() {
             .putBoolean(PREF_ENABLED, false)
             .apply()
 
-        handler.removeCallbacksAndMessages(null)
         sendBroadcast(Intent(ACTION_CLOSE_LOCK).setPackage(packageName))
         stopForeground(true)
         stopSelf()
     }
 
     override fun onDestroy() {
-        handler.removeCallbacksAndMessages(null)
         if (screenReceiverRegistered) {
             try {
                 unregisterReceiver(screenReceiver)
