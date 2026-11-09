@@ -97,7 +97,7 @@ class PhantomLockActivity : Activity() {
         override fun run() {
             if (::clockLabel.isInitialized) {
                 val now = Date()
-                clockLabel.text = SimpleDateFormat("HH  :  mm", Locale.getDefault()).format(now)
+                clockLabel.text = SimpleDateFormat("HH\nmm", Locale.getDefault()).format(now)
                 dateLabel.text = SimpleDateFormat(
                     "EEEE  ·  d MMMM",
                     Locale.getDefault()
@@ -265,8 +265,8 @@ class PhantomLockActivity : Activity() {
         )
 
         clockLabel = TextView(this).apply {
-            text = SimpleDateFormat("HH  :  mm", Locale.getDefault()).format(Date())
-            textSize = 73f
+            text = SimpleDateFormat("HH\nmm", Locale.getDefault()).format(Date())
+            textSize = 67f
             setTextColor(0xFFF5F1EA.toInt())
             typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
             gravity = Gravity.START or Gravity.CENTER_VERTICAL
@@ -278,10 +278,10 @@ class PhantomLockActivity : Activity() {
             clockLabel,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(104),
+                dp(170),
                 Gravity.TOP or Gravity.START
             ).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.165f).toInt()
+                topMargin = (resources.displayMetrics.heightPixels * 0.105f).toInt()
                 marginStart = dp(25)
                 marginEnd = dp(20)
             }
@@ -302,7 +302,7 @@ class PhantomLockActivity : Activity() {
                 dp(28),
                 Gravity.TOP or Gravity.START
             ).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.265f).toInt()
+                topMargin = (resources.displayMetrics.heightPixels * 0.34f).toInt()
                 marginStart = dp(29)
                 marginEnd = dp(20)
             }
@@ -314,7 +314,7 @@ class PhantomLockActivity : Activity() {
         root.addView(
             dateRule,
             FrameLayout.LayoutParams(dp(54), dp(1), Gravity.TOP or Gravity.START).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.315f).toInt()
+                topMargin = (resources.displayMetrics.heightPixels * 0.385f).toInt()
                 marginStart = dp(30)
             }
         )
@@ -334,7 +334,7 @@ class PhantomLockActivity : Activity() {
                 dp(20),
                 Gravity.TOP or Gravity.START
             ).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.325f).toInt()
+                topMargin = (resources.displayMetrics.heightPixels * 0.398f).toInt()
                 marginStart = dp(30)
             }
         )
@@ -470,7 +470,7 @@ class PhantomLockActivity : Activity() {
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.TOP or Gravity.START
             ).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.405f).toInt()
+                topMargin = (resources.displayMetrics.heightPixels * 0.46f).toInt()
                 marginStart = dp(29)
                 marginEnd = dp(31)
             }
