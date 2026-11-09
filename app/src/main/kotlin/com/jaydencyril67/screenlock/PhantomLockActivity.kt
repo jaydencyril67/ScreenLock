@@ -43,7 +43,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Full-screen lock surface. The 72dp fingerprint artwork remains the same
+ * Full-screen lock surface. The S20-scale fingerprint artwork remains the same
  * touch target and retains its existing one-use arm and biometric behavior.
  */
 class PhantomLockActivity : Activity() {
@@ -451,7 +451,7 @@ class PhantomLockActivity : Activity() {
             }
         )
 
-        // The fingerprint remains completely standalone, with no ring, tile,
+        // The compact S20-scale fingerprint remains completely standalone, with no ring, tile,
         // plate, shadow or background behind it.
         val sensorStack = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -518,7 +518,7 @@ class PhantomLockActivity : Activity() {
         fingerprintView = fingerprint
         sensorStack.addView(
             fingerprint,
-            LinearLayout.LayoutParams(dp(68), dp(68))
+            LinearLayout.LayoutParams(dp(38), dp(38))
         )
 
         fingerprintHint = TextView(this).apply {
@@ -545,7 +545,7 @@ class PhantomLockActivity : Activity() {
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
             ).apply {
-                bottomMargin = dp(73)
+                bottomMargin = dp(110)
             }
         )
 
