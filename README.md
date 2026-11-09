@@ -1,20 +1,34 @@
 # Phantom Lock
 
-A dark, glass-inspired Android lock-screen-style interface for the Samsung Galaxy A02.
+A Samsung S20-inspired secondary lock layer for Android, designed for the Galaxy A02 / Android 11.
 
-## Current interaction
+## How it works
 
-- Touching the on-screen fingerprint normally produces haptic feedback and a "Fingerprint not matched" message.
-- Tapping the small locked keypad icon silently arms the next fingerprint touch.
-- The next fingerprint touch launches Android's genuine device-credential authentication (PIN, pattern, or password).
-- The hidden arming state is automatically cleared after use or timeout.
+1. Grant **Display over other apps** permission.
+2. Set a secure Android screen lock (PIN, pattern or password).
+3. Activate Phantom Lock.
+4. Your normal Samsung lock screen remains the first security layer.
+5. After Android unlocks, Phantom displays its full-screen lock layer over apps.
+6. Triple-tap the fingerprint artwork to open Android's genuine biometric/device-credential prompt.
+7. Successful Android authentication dismisses Phantom until the next screen-off / unlock cycle.
 
-## Important security boundary
+The protection service runs in the foreground and restores itself after reboot while protection is enabled. Its persistent notification includes a **Turn off** action as an emergency exit.
 
-The Galaxy A02 does not have an in-display fingerprint sensor. The on-screen fingerprint is a visual/touch interaction, not biometric verification. Android's system credential prompt remains the actual authentication authority.
+## Authentication and hardware boundary
 
-This app is a lock-screen-style experience opened as an app. It does not replace or bypass Samsung's secure system lock screen.
+The fingerprint illustration is a visual design element. It does not read fingerprints from the touchscreen.
+
+The Galaxy A02 has no fingerprint sensor, so this device uses the Android system PIN, pattern or password prompt. On supported devices with an enrolled strong fingerprint sensor, Android may offer biometric authentication through the same system prompt.
+
+Phantom Lock does not replace, bypass, or draw over Android's secure keyguard. It adds a secondary app-lock layer after the native keyguard has been dismissed. Android may hide application overlays in protected system surfaces or security-sensitive apps.
+
+## Permissions
+
+- Display over other apps: show the secondary lock layer.
+- Foreground service: keep protection active while the phone is in use.
+- Boot completed: restore protection after a reboot.
+- Use biometric: allow Android's own biometric/device-credential prompt.
 
 ## Build
 
-The GitHub Actions workflow builds a debug APK. Open the workflow run and download the `app-debug` artifact.
+The GitHub Actions workflow builds the debug APK on every push to `main`. Download the `screenlock-debug-apk` artifact from the workflow run.
