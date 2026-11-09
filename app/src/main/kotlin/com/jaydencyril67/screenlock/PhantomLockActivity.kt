@@ -134,7 +134,7 @@ class PhantomLockActivity : Activity() {
                     }
                 }
 
-                PhantomNotificationListenerService.ACTION_DATA_CHANGED -> {
+                PhantomNotificationData.ACTION_DATA_CHANGED -> {
                     if (::notificationContainer.isInitialized) refreshDynamicContent()
                 }
 
@@ -534,7 +534,7 @@ class PhantomLockActivity : Activity() {
 
     private fun renderNotifications() {
         notificationContainer.removeAllViews()
-        val items = PhantomNotificationListenerService.notifications().take(3)
+        val items = PhantomNotificationData.notifications().take(3)
         notificationHeading.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
         notificationContainer.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
 
@@ -635,7 +635,7 @@ class PhantomLockActivity : Activity() {
     }
 
     private fun connectMediaSession() {
-        val token = PhantomNotificationListenerService.mediaToken()
+        val token = PhantomNotificationData.mediaToken()
         if (token == activeMediaToken) return
 
         try {
@@ -850,7 +850,7 @@ class PhantomLockActivity : Activity() {
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(PhantomOverlayService.ACTION_CLOSE_LOCK)
-            addAction(PhantomNotificationListenerService.ACTION_DATA_CHANGED)
+            addAction(PhantomNotificationData.ACTION_DATA_CHANGED)
         }
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(screenOffReceiver, filter, Context.RECEIVER_NOT_EXPORTED)

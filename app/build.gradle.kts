@@ -15,6 +15,23 @@ android {
         versionName = "1.0.0"
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
+    flavorDimensions += "distribution"
+
+    productFlavors {
+        create("sideload") {
+            dimension = "distribution"
+            buildConfigField("boolean", "HAS_NOTIFICATION_ACCESS", "false")
+        }
+        create("play") {
+            dimension = "distribution"
+            buildConfigField("boolean", "HAS_NOTIFICATION_ACCESS", "true")
+        }
+    }
+
     signingConfigs {
         create("release") {
             storeFile = file(providers.gradleProperty("PHANTOM_KEYSTORE_FILE").orElse("missing.keystore").get())

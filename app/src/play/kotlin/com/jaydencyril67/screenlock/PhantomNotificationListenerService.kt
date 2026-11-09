@@ -1,7 +1,6 @@
 package com.jaydencyril67.screenlock
 
 import android.app.Notification
-import android.app.PendingIntent
 import android.app.KeyguardManager
 import android.content.ComponentName
 import android.content.Intent
@@ -11,36 +10,12 @@ import android.media.session.PlaybackState
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 
-data class PhantomLockNotification(
-    val key: String,
-    val appName: String,
-    val title: String,
-    val message: String,
-    val postedAt: Long,
-    val contentIntent: PendingIntent?
-)
-
 /**
  * Reads notifications only after the user explicitly grants Android's
  * Notification access permission. Private notification content is redacted
  * while the system keyguard is locked.
  */
 class PhantomNotificationListenerService : NotificationListenerService() {
-
-    companion object {
-        const val ACTION_DATA_CHANGED =
-            "com.jaydencyril67.screenlock.action.LOCKSCREEN_DATA_CHANGED"
-
-        @Volatile
-        private var cachedNotifications: List<PhantomLockNotification> = emptyList()
-
-        @Volatile
-        private var cachedMediaToken: MediaSession.Token? = null
-
-        fun notifications(): List<PhantomLockNotification> = cachedNotifications
-
-        fun mediaToken(): MediaSession.Token? = cachedMediaToken
-    }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
@@ -56,8 +31,7 @@ class PhantomNotificationListenerService : NotificationListenerService() {
     }
 
     override fun onListenerDisconnected() {
-        cachedNotifications = emptyList()
-        cachedMediaToken = null
+        PhantomNotificationData.clear()
         broadcastChanged()
         super.onListenerDisconnected()
     }
@@ -104,8 +78,6 @@ class PhantomNotificationListenerService : NotificationListenerService() {
                 }
             }
         }
-        cachedMediaToken = selectedToken
-
         val result = ArrayList<PhantomLockNotification>()
         for (sbn in mediaItems) {
             if (result.size >= 4) break
@@ -158,17 +130,19 @@ class PhantomNotificationListenerService : NotificationListenerService() {
                     title = title,
                     message = message,
                     postedAt = sbn.postTime,
-                    contentIntent = notification.contentIntent
+                    contentIntent = if (
+                        !keyguardLocked || notification.visibility == Notification.VISIBILITY_PUBLIC
+                    ) notification.contentIntent else null
                 )
             )
         }
 
-        cachedNotifications = result
+        PhantomNotificationData.update(result, selectedToken)
         broadcastChanged()
     }
 
     private fun broadcastChanged() {
-        sendBroadcast(Intent(ACTION_DATA_CHANGED).setPackage(packageName))
+        sendBroadcast(Intent(PhantomNotificationData.ACTION_DATA_CHANGED).setPackage(packageName))
     }
 
 }

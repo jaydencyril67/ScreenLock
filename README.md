@@ -46,8 +46,16 @@ The fingerprint and padlock vector drawables are based on Google Material Design
 
 Phantom Lock uses a dedicated charcoal-and-copper adaptive launcher icon on Android 8.0 and newer.
 
+## Distribution variants
+
+Phantom Lock has two Android build variants because Google's Play Protect blocks unverified apps installed directly from internet sources when they declare notification-listener access.
+
+- **Sideload edition:** used for GitHub Releases. It does not declare or include the notification-listener service, so it avoids that sensitive install-time declaration. The lockscreen, fingerprint interaction, battery, clock and padlock features remain available. Notification previews and third-party media controls are omitted from this edition.
+- **Play-distribution edition:** retains the notification-listener service, notification previews and media-session controls. The service is isolated to this variant, uses Android's protected notification-listener binding, and only makes private notification content clickable after the device is unlocked. This build is intended for distribution through Google Play, subject to Google's review and policies.
+
 ## Build and downloads
 
-- **Normal installation:** open the repository's **Releases** page and download the `PhantomLock-x.y.z.apk` asset. This is a direct APK file; it is not an Actions ZIP.
-- **Debug/testing only:** the push workflow builds a debug APK. GitHub Actions wraps downloadable workflow artifacts in a ZIP, so do not use that ZIP as the normal release download.
-- The manual release workflow publishes the signed APK directly as a GitHub Release asset.
+- **Normal installation:** open the repository's **Releases** page and download the `PhantomLock-x.y.z.apk` asset. This is the signed sideload edition as a direct APK file, not an Actions ZIP.
+- **Debug/testing only:** the push workflow builds both variants to check compilation, but uploads only the sideload debug APK. GitHub Actions wraps downloadable workflow artifacts in a ZIP, so do not use that ZIP as the normal release download.
+- The manual release workflow publishes the signed sideload APK directly as a GitHub Release asset.
+- The Play-distribution variant can be built with `gradle :app:assemblePlayRelease`; the sideload release uses `gradle :app:assembleSideloadRelease`.

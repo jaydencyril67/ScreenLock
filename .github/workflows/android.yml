@@ -38,11 +38,11 @@ jobs:
           yes | sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Build debug APK
-        run: gradle --no-daemon :app:assembleDebug
+        run: gradle --no-daemon :app:assembleSideloadDebug :app:assemblePlayDebug
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: screenlock-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/sideload/debug/app-sideload-debug.apk
           if-no-files-found: error

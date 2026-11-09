@@ -150,12 +150,12 @@ jobs:
           EOF
 
       - name: Build signed Phantom Lock APK
-        run: gradle --no-daemon --stacktrace :app:assembleRelease
+        run: gradle --no-daemon --stacktrace :app:assembleSideloadRelease
 
       - name: Verify signed APK
         run: |
           set -euo pipefail
-          APK="app/build/outputs/apk/release/app-release.apk"
+          APK="app/build/outputs/apk/sideload/release/app-sideload-release.apk"
           test -s "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
           cp "$APK" "PhantomLock-${{ steps.version.outputs.app_version }}.apk"
