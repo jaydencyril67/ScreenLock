@@ -4,8 +4,9 @@ A custom Samsung Galaxy S20-inspired lock screen for Android, designed for the G
 
 ## Lock-screen experience
 
-- Phantom launches immediately on the dynamic screen-on broadcast while protection is enabled.
-- The Activity uses Android's show-when-locked and turn-screen-on behavior to appear above the native keyguard.
+- When the device becomes non-interactive, the foreground service prepares the full-screen lock Activity without turning the display back on.
+- The prepared Activity remains alive with Android's show-when-locked behavior, ready to appear over the native keyguard as the display wakes.
+- The screen-on broadcast is retained as a recovery fallback when the prepared Activity is missing.
 - The lock UI includes a dark atmospheric wallpaper, large live clock, date, battery percentage, a bold fingerprint mark and a small padlock.
 - The imported fingerprint artwork is intentionally shown without a surrounding sensor ring.
 - Tapping the fingerprint before arming displays **“Fingerprint doesn't match”**.
@@ -33,7 +34,7 @@ A persistent foreground-service notification provides an emergency **Turn off** 
 
 ## Wake and keyguard behavior
 
-The service responds immediately to the dynamic screen-on broadcast without an extra launch delay. Its foreground service and user-granted overlay permission allow the background lock Activity launch. The Activity uses Android's supported show-when-locked and turn-screen-on APIs to appear above the native lock screen.
+The earlier implementation waited for ACTION_SCREEN_ON and only then started the lock Activity. Android documents ACTION_SCREEN_ON as the point when the device has already woken and become interactive, so the native keyguard can begin appearing before an app launched in response is ready. The updated service instead starts the lock Activity on ACTION_SCREEN_OFF, when the device becomes non-interactive. In this prepare-only mode, the Activity uses showWhenLocked but explicitly does not turn the display back on. Its window and UI are created before the next wake. ACTION_SCREEN_ON remains a fallback if the prepared Activity was killed or the screen-off event was missed. Background Activity launch relies on the user-granted SYSTEM_ALERT_WINDOW permission.
 
 Android and Samsung still control keyguard scheduling, battery restrictions and protected system surfaces. Phantom requests the earliest app-controlled launch, but it cannot replace the operating system's keyguard or guarantee a zero-frame transition on every firmware build.
 
