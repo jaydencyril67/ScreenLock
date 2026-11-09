@@ -69,6 +69,8 @@ class PhantomLockActivity : Activity() {
     private lateinit var mediaArtwork: ImageView
     private lateinit var mediaSubtitle: TextView
     private lateinit var mediaPlayPause: TextView
+    private lateinit var mediaPrevious: TextView
+    private lateinit var mediaNext: TextView
     private var fingerprintView: ImageView? = null
     private var mediaController: MediaController? = null
     private var activeMediaToken: android.media.session.MediaSession.Token? = null
@@ -431,7 +433,7 @@ class PhantomLockActivity : Activity() {
             gravity = Gravity.START or Gravity.CENTER_VERTICAL
             setPadding(0, dp(4), 0, 0)
         }
-        val previous = mediaControl("‹", "Previous track") {
+        mediaPrevious = mediaControl("‹", "Previous track") {
             mediaController?.transportControls?.skipToPrevious()
         }
         mediaPlayPause = mediaControl("Ⅱ", "Play or pause") {
@@ -442,12 +444,12 @@ class PhantomLockActivity : Activity() {
                 controller.transportControls.play()
             }
         }
-        val next = mediaControl("›", "Next track") {
+        mediaNext = mediaControl("›", "Next track") {
             mediaController?.transportControls?.skipToNext()
         }
-        mediaControls.addView(previous, LinearLayout.LayoutParams(dp(48), dp(38)))
+        mediaControls.addView(mediaPrevious, LinearLayout.LayoutParams(dp(48), dp(38)))
         mediaControls.addView(mediaPlayPause, LinearLayout.LayoutParams(dp(48), dp(38)))
-        mediaControls.addView(next, LinearLayout.LayoutParams(dp(48), dp(38)))
+        mediaControls.addView(mediaNext, LinearLayout.LayoutParams(dp(48), dp(38)))
         mediaContainer.addView(
             mediaControls,
             LinearLayout.LayoutParams(
@@ -680,16 +682,24 @@ class PhantomLockActivity : Activity() {
             }
             mediaArtwork.setImageResource(R.drawable.ic_music_note)
             mediaPlayPause.text = "▶"
+            mediaPrevious.isEnabled = false
+            mediaPrevious.alpha = 0.35f
             mediaPlayPause.isEnabled = false
-            mediaPlayPause.alpha = 0.45f
+            mediaPlayPause.alpha = 0.35f
+            mediaNext.isEnabled = false
+            mediaNext.alpha = 0.35f
             return
         }
 
         mediaContainer.visibility = View.VISIBLE
         mediaTitle.text = title
         mediaSubtitle.text = artist.orEmpty()
+        mediaPrevious.isEnabled = true
+        mediaPrevious.alpha = 1f
         mediaPlayPause.isEnabled = true
         mediaPlayPause.alpha = 1f
+        mediaNext.isEnabled = true
+        mediaNext.alpha = 1f
         val artwork = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
             ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
         if (artwork != null) {
