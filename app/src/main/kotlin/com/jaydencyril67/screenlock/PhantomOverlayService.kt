@@ -20,6 +20,7 @@ class PhantomOverlayService : Service() {
         const val ACTION_START = "com.jaydencyril67.screenlock.action.START"
         const val ACTION_STOP = "com.jaydencyril67.screenlock.action.STOP"
         const val ACTION_CLOSE_LOCK = "com.jaydencyril67.screenlock.action.CLOSE_LOCK"
+        const val ACTION_RESTORE_LOCK = "com.jaydencyril67.screenlock.action.RESTORE_LOCK"
         const val PREFS = "phantom_lock_settings"
         const val PREF_ENABLED = "protection_enabled"
 
@@ -73,6 +74,13 @@ class PhantomOverlayService : Service() {
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                     .putBoolean(PREF_ENABLED, true)
                     .apply()
+            }
+
+            ACTION_RESTORE_LOCK -> {
+                if (isProtectionEnabled()) {
+                    Log.i(TAG, "Restoring Phantom after system navigation")
+                    launchLockScreen(PhantomLockActivity.ACTION_WAKE)
+                }
             }
         }
 
