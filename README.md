@@ -7,7 +7,7 @@ A custom Samsung Galaxy S20-inspired lock screen for Android, designed for the G
 - When the device becomes non-interactive, the foreground service prepares the full-screen lock Activity without turning the display back on.
 - The prepared Activity remains alive with Android's show-when-locked behavior, ready to appear over the native keyguard as the display wakes.
 - The screen-on broadcast is retained as a recovery fallback when the prepared Activity is missing.
-- The lock UI includes a dark atmospheric wallpaper, large live clock, date, battery percentage, a bold fingerprint mark and a small padlock.
+- The lock UI includes a selectable local-photo wallpaper, a redesigned editorial clock, date, battery percentage, a bold fingerprint mark, music controls, and flashlight/camera shortcuts.
 - The imported fingerprint artwork is intentionally shown without a surrounding sensor ring.
 - Tapping the fingerprint before arming displays **“Fingerprint doesn't match”**.
 - Tapping the small padlock silently arms exactly one fingerprint tap.
@@ -50,12 +50,12 @@ Phantom Lock uses a dedicated charcoal-and-copper adaptive launcher icon on Andr
 
 Phantom Lock has two Android build variants because Google's Play Protect blocks unverified apps installed directly from internet sources when they declare notification-listener access.
 
-- **Sideload edition:** used for GitHub Releases. It does not declare or include the notification-listener service, so it avoids that sensitive install-time declaration. The lockscreen, fingerprint interaction, battery, clock and padlock features remain available. Notification previews and third-party media controls are omitted from this edition.
-- **Play-distribution edition:** retains the notification-listener service, notification previews and media-session controls. The service is isolated to this variant, uses Android's protected notification-listener binding, and only makes private notification content clickable after the device is unlocked. This build is intended for distribution through Google Play, subject to Google's review and policies.
+- **Sideload edition:** used for GitHub Releases. It does not declare or include the notification-listener service, so it avoids that sensitive install-time declaration. The lockscreen, fingerprint interaction, battery, clock, flashlight and camera shortcuts remain available. Third-party music-session controls are omitted from this edition.
+- **Play-distribution edition:** retains the protected notification-listener service solely to obtain active media-session controls. Phantom does not read, store, or display notification content. Android requires this access to control other apps' media sessions. This build is intended for distribution through Google Play, subject to Google's review and policies.
 
 ## Build and downloads
 
 - **Normal installation:** open the repository's **Releases** page and download the `PhantomLock-x.y.z.apk` asset. This is the signed sideload edition as a direct APK file, not an Actions ZIP.
-- **Debug/testing only:** the push workflow builds both variants to check compilation, but uploads only the sideload debug APK. GitHub Actions wraps downloadable workflow artifacts in a ZIP, so do not use that ZIP as the normal release download.
+- **Debug/testing only:** the push workflow builds both variants to check compilation, but publishes the sideload debug APK as a direct GitHub Release asset. GitHub Actions workflow artifacts are ZIP-wrapped, so use the direct APK release asset instead.
 - The manual release workflow publishes the signed sideload APK directly as a GitHub Release asset.
 - The Play-distribution variant can be built with `gradle :app:assemblePlayRelease`; the sideload release uses `gradle :app:assembleSideloadRelease`.
