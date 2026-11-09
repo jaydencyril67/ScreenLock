@@ -3,7 +3,7 @@
     <application>
         <service
             android:name=".PhantomNotificationListenerService"
-            android:label="ScreenLock notification and music access"
+            android:label="ScreenLock music control access"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
             android:exported="false">
             <intent-filter>
