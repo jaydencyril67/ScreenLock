@@ -1,7 +1,6 @@
 package com.jaydencyril67.screenlock
 
 import android.app.Activity
-import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
@@ -27,7 +26,6 @@ class MainActivity : Activity() {
     private lateinit var statusTitle: TextView
     private lateinit var statusDetails: TextView
     private lateinit var overlayButton: Button
-    private lateinit var notificationAccessButton: Button
     private lateinit var protectionButton: Button
     private lateinit var wallpaperStatus: TextView
     private lateinit var resetWallpaperButton: Button
@@ -108,16 +106,6 @@ class MainActivity : Activity() {
         overlayButton.setOnClickListener { requestOverlayPermission() }
         root.addView(overlayButton, buttonParams())
 
-        notificationAccessButton = actionButton(
-            "ALLOW MUSIC CONTROL ACCESS",
-            0xFF34313A.toInt()
-        )
-        notificationAccessButton.setOnClickListener { requestNotificationAccess() }
-        root.addView(
-            notificationAccessButton,
-            buttonParams().apply { topMargin = dp(12) }
-        )
-
         val wallpaperSection = label(
             "LOCKSCREEN WALLPAPER",
             10f,
@@ -158,11 +146,7 @@ class MainActivity : Activity() {
 
         val note = label(
             "HOW IT WORKS\nWhen the display goes to sleep, Phantom prepares its full-screen lock window without turning the display back on. When you wake the phone, the prepared window is already in place over the lockscreen. A screen-on launch remains as a recovery fallback.\n\nA small padlock silently arms one fingerprint tap. An ordinary fingerprint tap displays “Fingerprint doesn't match” with haptic feedback. On phones with enrolled fingerprint hardware, Android's genuine biometric prompt is used. The Galaxy A02 has no fingerprint reader, so its armed tap is a visual unlock gesture.\n\n" +
-                if (BuildConfig.HAS_NOTIFICATION_ACCESS) {
-                    "MUSIC CONTROL\nAndroid's media-session access lets Phantom display track details and control the active player. Phantom does not read or display your notifications."
-                } else {
-                    "MUSIC CONTROL\nAndroid requires notification-listener access to read other apps' active media sessions. To keep this direct-download edition installable without that sensitive permission, active music controls are available in the Play-distribution build. Phantom does not display notification previews."
-                },
+                "LOCAL MUSIC\nChoose audio files stored on your phone. Phantom plays those selected tracks directly, with previous, play/pause and next controls. It does not need notification-listener access and does not read or display your notifications.",
             12f,
             0xFF8793AD.toInt(),
             false
@@ -189,9 +173,6 @@ class MainActivity : Activity() {
 
     private fun refreshDashboard() {
         refreshWallpaperStatus()
-        notificationAccessButton.visibility =
-            if (BuildConfig.HAS_NOTIFICATION_ACCESS) View.VISIBLE else View.GONE
-
         val overlayGranted = Settings.canDrawOverlays(this)
         val enabled = prefs.getBoolean(PhantomOverlayService.PREF_ENABLED, false)
 
@@ -199,12 +180,6 @@ class MainActivity : Activity() {
             "DISPLAY OVER OTHER APPS  ·  ALLOWED"
         } else {
             "ALLOW DISPLAY OVER OTHER APPS"
-        }
-
-        notificationAccessButton.text = if (notificationAccessGranted()) {
-            "MUSIC CONTROL ACCESS  ·  ALLOWED"
-        } else {
-            "ALLOW MUSIC CONTROL ACCESS"
         }
 
         when {
@@ -341,41 +316,6 @@ class MainActivity : Activity() {
             )
         } catch (_: Exception) {
             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
-        }
-    }
-
-    private fun notificationAccessGranted(): Boolean {
-        val enabled = Settings.Secure.getString(
-            contentResolver,
-            "enabled_notification_listeners"
-        ).orEmpty()
-
-        return enabled.split(':').any { entry ->
-            val component = ComponentName.unflattenFromString(entry)
-            component != null &&
-                component.packageName == packageName &&
-                component.className == "$packageName.PhantomNotificationListenerService"
-        }
-    }
-
-    private fun requestNotificationAccess() {
-        if (notificationAccessGranted()) {
-            Toast.makeText(
-                this,
-                "Notification access is already enabled.",
-                Toast.LENGTH_SHORT
-            ).show()
-            return
-        }
-
-        try {
-            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-        } catch (_: Exception) {
-            Toast.makeText(
-                this,
-                "Open Android Settings and enable notification access for ScreenLock.",
-                Toast.LENGTH_LONG
-            ).show()
         }
     }
 
