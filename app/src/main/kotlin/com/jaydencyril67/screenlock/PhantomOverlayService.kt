@@ -34,15 +34,22 @@ class PhantomOverlayService : Service() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_SCREEN_OFF -> {
-                    Log.d(TAG, "Screen off: closing Phantom lock surface")
-                    sendBroadcast(Intent(ACTION_CLOSE_LOCK).setPackage(packageName))
+                    if (isProtectionEnabled()) {
+                        Log.d(TAG, "Screen going non-interactive: preparing lock surface before next wake")
+                        prepareLockScreen()
+                    }
                 }
 
                 Intent.ACTION_SCREEN_ON -> {
                     if (isProtectionEnabled()) {
-                        // Launch immediately from the screen-on broadcast. There is no
-                        // extra timer, so Phantom gets the earliest app-controlled frame.
-                        launchLockScreen()
+                        if (PhantomLockActivity.isAlive) {
+                            Log.d(TAG, "Screen interactive: pre-prepared Phantom activity is already alive")
+                        } else {
+                            // Recovery path for process death, missed screen-off events,
+                            // or a Samsung power-management restart while the display slept.
+                            Log.w(TAG, "No prepared lock activity found; using screen-on fallback")
+                            launchLockScreen(PhantomLockActivity.ACTION_WAKE)
+                        }
                     }
                 }
             }
@@ -74,8 +81,6 @@ class PhantomOverlayService : Service() {
             return START_NOT_STICKY
         }
 
-        // User-granted overlay permission is the Android background-activity-launch
-        // exception used by this screen-on lock utility.
         if (!Settings.canDrawOverlays(this)) {
             getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putBoolean(PREF_ENABLED, false)
@@ -92,11 +97,28 @@ class PhantomOverlayService : Service() {
         getSharedPreferences(PREFS, MODE_PRIVATE)
             .getBoolean(PREF_ENABLED, false)
 
-    private fun launchLockScreen() {
+    /**
+     * Start and fully create the lock Activity while the display is non-interactive.
+     * The Activity is showWhenLocked but deliberately does not turn the display on.
+     * This moves Activity creation/layout work out of the screen-on race.
+     */
+    private fun prepareLockScreen() {
+        if (!isProtectionEnabled() || !Settings.canDrawOverlays(this)) return
+
+        if (PhantomLockActivity.isAlive) {
+            Log.d(TAG, "Phantom lock activity already prepared")
+            return
+        }
+
+        launchLockScreen(PhantomLockActivity.ACTION_PREPARE)
+    }
+
+    private fun launchLockScreen(action: String) {
         if (!isProtectionEnabled() || !Settings.canDrawOverlays(this)) return
 
         try {
             val intent = Intent(this, PhantomLockActivity::class.java).apply {
+                this.action = action
                 addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or
                         Intent.FLAG_ACTIVITY_SINGLE_TOP or
@@ -105,9 +127,9 @@ class PhantomOverlayService : Service() {
                 )
             }
             startActivity(intent)
-            Log.d(TAG, "Phantom lock launch requested immediately on SCREEN_ON")
+            Log.i(TAG, "Phantom lock Activity launch requested: $action")
         } catch (error: Exception) {
-            Log.e(TAG, "Unable to launch Phantom lock screen on wake", error)
+            Log.e(TAG, "Unable to launch Phantom lock Activity ($action)", error)
         }
     }
 
@@ -144,7 +166,7 @@ class PhantomOverlayService : Service() {
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentTitle("Phantom Lock is active")
-            .setContentText("Your custom lock screen appears as soon as the display wakes.")
+            .setContentText("Phantom prepares its lock screen before the display wakes.")
             .setContentIntent(openApp)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -164,7 +186,7 @@ class PhantomOverlayService : Service() {
                 "Phantom Lock protection",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Keeps Phantom Lock ready for each screen wake."
+                description = "Prepares the Phantom lock surface for each screen wake."
                 setShowBadge(false)
             }
             (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
