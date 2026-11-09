@@ -25,6 +25,12 @@ android {
         }
     }
 
+    // This is a sideloaded Android 11+ utility, not a Google Play submission.
+    // Keep targetSdk 30 for now and suppress only Play's expired-target lint check.
+    lint {
+        disable += "ExpiredTargetSdkVersion"
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
