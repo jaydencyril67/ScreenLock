@@ -273,9 +273,22 @@ class MainActivity : Activity() {
     }
 
     private fun restoreDefaultWallpaper() {
+        releaseWallpaperPermission(PhantomWallpaperStore.savedUri(this))
         prefs.edit().remove(PhantomWallpaperStore.PREF_KEY).apply()
         refreshWallpaperStatus()
         Toast.makeText(this, "Default Phantom wallpaper restored.", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun releaseWallpaperPermission(uri: Uri?) {
+        if (uri == null) return
+        try {
+            contentResolver.releasePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        } catch (_: SecurityException) {
+            // The picker may already have revoked the persisted grant.
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -298,6 +311,10 @@ class MainActivity : Activity() {
             }
         }
 
+        val previousUri = PhantomWallpaperStore.savedUri(this)
+        if (previousUri != selectedUri) {
+            releaseWallpaperPermission(previousUri)
+        }
         prefs.edit()
             .putString(PhantomWallpaperStore.PREF_KEY, selectedUri.toString())
             .apply()
