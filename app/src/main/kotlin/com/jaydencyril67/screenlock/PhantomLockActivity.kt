@@ -956,7 +956,7 @@ class PhantomLockActivity : Activity() {
 
     private fun updateClock() {
         val now = Date()
-        clockLabel.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(now)
+        clockLabel.text = SimpleDateFormat("HH\nmm", Locale.getDefault()).format(now)
         dateLabel.text = SimpleDateFormat(
             "EEEE  ·  d MMMM",
             Locale.getDefault()
