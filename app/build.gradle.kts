@@ -24,11 +24,9 @@ android {
     productFlavors {
         create("sideload") {
             dimension = "distribution"
-            buildConfigField("boolean", "HAS_NOTIFICATION_ACCESS", "false")
         }
         create("play") {
             dimension = "distribution"
-            buildConfigField("boolean", "HAS_NOTIFICATION_ACCESS", "true")
         }
     }
 
