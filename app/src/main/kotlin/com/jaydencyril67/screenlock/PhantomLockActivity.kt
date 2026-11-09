@@ -19,6 +19,9 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
+import android.media.session.MediaController
+import android.media.session.MediaMetadata
+import android.media.session.PlaybackState
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
@@ -41,10 +44,8 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Phantom's native glass lock screen.
- *
- * The fingerprint artwork is a visual touch target only. Where strong biometric
- * hardware is available, verification is delegated to Android's BiometricPrompt.
+ * Full-screen lock surface. The 72dp fingerprint artwork remains the same
+ * touch target and retains its existing one-use arm and biometric behavior.
  */
 class PhantomLockActivity : Activity() {
 
@@ -68,7 +69,31 @@ class PhantomLockActivity : Activity() {
     private lateinit var dateLabel: TextView
     private lateinit var batteryLabel: TextView
     private lateinit var fingerprintHint: TextView
+    private lateinit var notificationHeading: TextView
+    private lateinit var notificationContainer: LinearLayout
+    private lateinit var mediaContainer: LinearLayout
+    private lateinit var mediaTitle: TextView
+    private lateinit var mediaSubtitle: TextView
+    private lateinit var mediaPlayPause: TextView
     private var fingerprintView: ImageView? = null
+    private var mediaController: MediaController? = null
+    private var activeMediaToken: android.media.session.MediaSession.Token? = null
+
+    private val mediaCallback = object : MediaController.Callback() {
+        override fun onMetadataChanged(metadata: MediaMetadata?) {
+            updateMediaContent()
+        }
+
+        override fun onPlaybackStateChanged(state: PlaybackState?) {
+            updateMediaContent()
+        }
+
+        override fun onSessionDestroyed() {
+            mediaController = null
+            activeMediaToken = null
+            updateMediaContent()
+        }
+    }
 
     private val clockTick = object : Runnable {
         override fun run() {
@@ -108,6 +133,10 @@ class PhantomLockActivity : Activity() {
                         fingerprintHint.setTextColor(0xC9DCE9F8.toInt())
                         fingerprintHint.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
                     }
+                }
+
+                PhantomNotificationListenerService.ACTION_DATA_CHANGED -> {
+                    if (::notificationContainer.isInitialized) refreshDynamicContent()
                 }
 
                 PhantomOverlayService.ACTION_CLOSE_LOCK -> {
@@ -188,7 +217,7 @@ class PhantomLockActivity : Activity() {
 
     private fun buildLockScreen() {
         val root = FrameLayout(this).apply {
-            setBackgroundColor(Color.rgb(4, 7, 16))
+            setBackgroundColor(Color.rgb(7, 8, 12))
             isFocusableInTouchMode = true
         }
 
@@ -200,238 +229,270 @@ class PhantomLockActivity : Activity() {
             )
         )
 
-        // Minimal floating header: brand, active state, battery and silent padlock.
-        val brandStack = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.START
-        }
-        val brand = TextView(this).apply {
-            text = "PHANTOM"
-            textSize = 11f
-            letterSpacing = 0.28f
-            setTextColor(0xFFF1F6FF.toInt())
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            includeFontPadding = false
-        }
-        val brandSubline = TextView(this).apply {
-            text = "PERSONAL LOCKSCREEN"
-            textSize = 7f
-            letterSpacing = 0.19f
-            setTextColor(0x8FAFC1DE.toInt())
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            includeFontPadding = false
-            setPadding(0, dp(5), 0, 0)
-        }
-        brandStack.addView(brand)
-        brandStack.addView(brandSubline)
-        root.addView(
-            brandStack,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP or Gravity.START
-            ).apply {
-                topMargin = dp(31)
-                marginStart = dp(27)
-            }
-        )
-
+        // Plain system information sits directly on the wallpaper.
         batteryLabel = TextView(this).apply {
             text = readBatteryPercent()
-            textSize = 9f
-            letterSpacing = 0.04f
-            setTextColor(0xFFE6EEF9.toInt())
+            textSize = 11f
+            letterSpacing = 0.08f
+            setTextColor(0xDDE8E7E4.toInt())
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             gravity = Gravity.CENTER
             includeFontPadding = false
-            setPadding(dp(13), dp(10), dp(13), dp(10))
-            background = glassSurface(22, 0x1BFFFFFF, 0x10FFFFFF)
         }
         root.addView(
             batteryLabel,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
-                dp(38),
+                dp(28),
                 Gravity.TOP or Gravity.END
             ).apply {
-                topMargin = dp(19)
-                marginEnd = dp(72)
+                topMargin = dp(29)
+                marginEnd = dp(67)
             }
         )
 
         val padlock = ImageButton(this).apply {
             setImageResource(R.drawable.ic_phantom_padlock)
-            scaleType = ImageView.ScaleType.CENTER_INSIDE
-            imageTintList = ColorStateList.valueOf(0xFFE5EFFC.toInt())
-            background = glassSurface(16, 0x20FFFFFF, 0x0DFFFFFF)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            imageTintList = ColorStateList.valueOf(0xFFECEAE6.toInt())
+            setBackgroundColor(Color.TRANSPARENT)
             contentDescription = "Arm fingerprint unlock"
-            setPadding(dp(11), dp(11), dp(11), dp(11))
-            elevation = dp(5).toFloat()
+            setPadding(0, 0, 0, 0)
             setOnClickListener { armFingerprint() }
         }
         root.addView(
             padlock,
-            FrameLayout.LayoutParams(
-                dp(44),
-                dp(44),
-                Gravity.TOP or Gravity.END
-            ).apply {
-                topMargin = dp(16)
-                marginEnd = dp(17)
+            FrameLayout.LayoutParams(dp(25), dp(25), Gravity.TOP or Gravity.END).apply {
+                topMargin = dp(29)
+                marginEnd = dp(25)
             }
         )
-
-        // Main glass time panel with a quiet cyan highlight and restrained typography.
-        val clockCard = FrameLayout(this).apply {
-            background = glassSurface(30, 0x24FFFFFF, 0x0BFFFFFF)
-            elevation = dp(18).toFloat()
-            clipToOutline = true
-        }
-        val clockStack = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(12), dp(8), dp(12), dp(8))
-        }
 
         clockLabel = TextView(this).apply {
             text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-            textSize = 72f
-            setTextColor(Color.WHITE)
+            textSize = 88f
+            setTextColor(0xFFF5F1EA.toInt())
             typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
-            gravity = Gravity.CENTER
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
             includeFontPadding = false
-            letterSpacing = -0.045f
-            setShadowLayer(dp(22).toFloat(), 0f, dp(3).toFloat(), 0x664A91D5)
+            letterSpacing = -0.075f
+            setShadowLayer(dp(18).toFloat(), 0f, dp(4).toFloat(), 0x775D3925)
         }
+        root.addView(
+            clockLabel,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                dp(104),
+                Gravity.TOP or Gravity.START
+            ).apply {
+                topMargin = (resources.displayMetrics.heightPixels * 0.155f).toInt()
+                marginStart = dp(27)
+                marginEnd = dp(20)
+            }
+        )
+
         dateLabel = TextView(this).apply {
+            textSize = 12f
+            letterSpacing = 0.11f
+            setTextColor(0xD9D6CFC5.toInt())
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            gravity = Gravity.START
+            includeFontPadding = false
+        }
+        root.addView(
+            dateLabel,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                dp(28),
+                Gravity.TOP or Gravity.START
+            ).apply {
+                topMargin = (resources.displayMetrics.heightPixels * 0.285f).toInt()
+                marginStart = dp(31)
+                marginEnd = dp(20)
+            }
+        )
+
+        val contentStack = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.TOP
+            clipChildren = false
+            clipToPadding = false
+        }
+
+        notificationHeading = TextView(this).apply {
+            text = "NOTIFICATIONS"
             textSize = 9f
             letterSpacing = 0.2f
-            setTextColor(0xFFD6E2F2.toInt())
+            setTextColor(0xAFC7BEB0.toInt())
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            gravity = Gravity.CENTER
             includeFontPadding = false
-            setPadding(0, dp(12), 0, dp(12))
+            visibility = View.GONE
         }
-
-        val accentLine = View(this).apply {
-            background = GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(0x008AE8FF, 0xFF8AE8FF.toInt(), 0x008AE8FF)
-            ).apply {
-                cornerRadius = dp(2).toFloat()
-            }
-        }
-
-        val activeStatus = TextView(this).apply {
-            text = "●  PHANTOM PROTECTION ACTIVE"
-            textSize = 7f
-            letterSpacing = 0.14f
-            setTextColor(0xFFB7DCEB.toInt())
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            setPadding(dp(13), dp(8), dp(13), dp(8))
-            background = glassSurface(18, 0x1B72C7D8, 0x0CFFFFFF)
-        }
-
-        clockStack.addView(
-            clockLabel,
+        contentStack.addView(
+            notificationHeading,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(82)
+                dp(20)
             )
         )
-        clockStack.addView(
-            dateLabel,
+
+        notificationContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = null
+        }
+        contentStack.addView(
+            notificationContainer,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(34)
+                LinearLayout.LayoutParams.WRAP_CONTENT
             )
         )
-        clockStack.addView(
-            accentLine,
-            LinearLayout.LayoutParams(dp(36), dp(2)).apply {
-                bottomMargin = dp(12)
-            }
+
+        mediaContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = null
+            visibility = View.GONE
+            setPadding(0, dp(13), 0, 0)
+        }
+        val mediaHeading = TextView(this).apply {
+            text = "NOW PLAYING"
+            textSize = 9f
+            letterSpacing = 0.2f
+            setTextColor(0xAFC7BEB0.toInt())
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            includeFontPadding = false
+        }
+        mediaContainer.addView(
+            mediaHeading,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(19)
+            )
         )
-        clockStack.addView(
-            activeStatus,
+
+        mediaTitle = TextView(this).apply {
+            textSize = 15f
+            setTextColor(0xFFF3EFE8.toInt())
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            includeFontPadding = false
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+        mediaContainer.addView(
+            mediaTitle,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(24)
+            )
+        )
+
+        mediaSubtitle = TextView(this).apply {
+            textSize = 11f
+            setTextColor(0xBFCAC1B7.toInt())
+            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+            includeFontPadding = false
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+        mediaContainer.addView(
+            mediaSubtitle,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(20)
+            )
+        )
+
+        val mediaControls = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            setPadding(0, dp(4), 0, 0)
+        }
+        val previous = mediaControl("‹", "Previous track") {
+            mediaController?.transportControls?.skipToPrevious()
+        }
+        mediaPlayPause = mediaControl("Ⅱ", "Play or pause") {
+            val controller = mediaController ?: return@mediaControl
+            if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
+                controller.transportControls.pause()
+            } else {
+                controller.transportControls.play()
+            }
+        }
+        val next = mediaControl("›", "Next track") {
+            mediaController?.transportControls?.skipToNext()
+        }
+        mediaControls.addView(previous, LinearLayout.LayoutParams(dp(48), dp(38)))
+        mediaControls.addView(mediaPlayPause, LinearLayout.LayoutParams(dp(48), dp(38)))
+        mediaControls.addView(next, LinearLayout.LayoutParams(dp(48), dp(38)))
+        mediaContainer.addView(
+            mediaControls,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                dp(28)
+                dp(42)
             )
         )
-        clockCard.addView(
-            clockStack,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
+        contentStack.addView(
+            mediaContainer,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             )
         )
+
         root.addView(
-            clockCard,
+            contentStack,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(176),
-                Gravity.TOP
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP or Gravity.START
             ).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.205f).toInt()
-                marginStart = dp(26)
-                marginEnd = dp(26)
+                topMargin = (resources.displayMetrics.heightPixels * 0.385f).toInt()
+                marginStart = dp(31)
+                marginEnd = dp(31)
             }
         )
 
-        // Bottom-anchored glass sensor tile. The fingerprint itself remains ringless.
+        // The fingerprint is the only object in its touch area: exactly 72dp,
+        // with no ring, tile, plate, shadow or background behind it.
         val sensorStack = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             clipChildren = false
             clipToPadding = false
         }
-
-        val sensorHitArea = FrameLayout(this).apply {
-            background = glassSurface(30, 0x27FFFFFF, 0x0EFFFFFF)
-            elevation = dp(16).toFloat()
-            isClickable = true
-            isFocusable = true
-            contentDescription = "Fingerprint"
-            setOnClickListener { onFingerprintPressed() }
-        }
-
         val fingerprint = ImageView(this).apply {
             setImageResource(R.drawable.ic_s20_fingerprint)
             scaleType = ImageView.ScaleType.FIT_CENTER
-            imageTintList = ColorStateList.valueOf(0xFFF7FAFF.toInt())
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            imageTintList = ColorStateList.valueOf(0xFFF5F2ED.toInt())
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            contentDescription = "Fingerprint"
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { onFingerprintPressed() }
         }
         fingerprintView = fingerprint
-        sensorHitArea.addView(
-            fingerprint,
-            FrameLayout.LayoutParams(dp(72), dp(72), Gravity.CENTER)
-        )
         sensorStack.addView(
-            sensorHitArea,
-            LinearLayout.LayoutParams(dp(112), dp(112))
+            fingerprint,
+            LinearLayout.LayoutParams(dp(72), dp(72))
         )
 
         fingerprintHint = TextView(this).apply {
             text = "TOUCH TO UNLOCK"
             textSize = 9f
-            letterSpacing = 0.2f
-            setTextColor(0xC9DCE9F8.toInt())
+            letterSpacing = 0.19f
+            setTextColor(0xC9E3DCD1.toInt())
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             gravity = Gravity.CENTER
             includeFontPadding = false
-            setPadding(dp(8), dp(15), dp(8), 0)
+            setPadding(0, dp(13), 0, 0)
         }
         sensorStack.addView(
             fingerprintHint,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                dp(34)
+                dp(31)
             )
         )
-
         root.addView(
             sensorStack,
             FrameLayout.LayoutParams(
@@ -439,30 +500,186 @@ class PhantomLockActivity : Activity() {
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
             ).apply {
-                bottomMargin = dp(83)
+                bottomMargin = dp(49)
             }
-        )
-
-        val footer = TextView(this).apply {
-            text = "DESIGNED TO STAY YOURS"
-            textSize = 7f
-            letterSpacing = 0.2f
-            setTextColor(0x667F9AB8)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-        }
-        root.addView(
-            footer,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(24),
-                Gravity.BOTTOM
-            ).apply { bottomMargin = dp(21) }
         )
 
         setContentView(root)
         updateClock()
+        refreshDynamicContent()
+    }
+
+    private fun mediaControl(
+        glyph: String,
+        description: String,
+        action: () -> Unit
+    ): TextView = TextView(this).apply {
+        text = glyph
+        textSize = 27f
+        setTextColor(0xFFECE5DA.toInt())
+        typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+        gravity = Gravity.CENTER
+        includeFontPadding = false
+        contentDescription = description
+        isClickable = true
+        isFocusable = true
+        setOnClickListener { action() }
+    }
+
+    private fun refreshDynamicContent() {
+        if (!::notificationContainer.isInitialized) return
+        renderNotifications()
+        connectMediaSession()
+        updateMediaContent()
+    }
+
+    private fun renderNotifications() {
+        notificationContainer.removeAllViews()
+        val items = PhantomNotificationListenerService.notifications().take(3)
+        notificationHeading.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
+        notificationContainer.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
+
+        items.forEachIndexed { index, item ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, dp(6), 0, dp(8))
+                isClickable = item.contentIntent != null
+                isFocusable = item.contentIntent != null
+                if (item.contentIntent != null) {
+                    setOnClickListener {
+                        try {
+                            item.contentIntent.send()
+                        } catch (_: Exception) {
+                            // The originating app may have cancelled its PendingIntent.
+                        }
+                    }
+                }
+            }
+
+            val app = TextView(this).apply {
+                text = item.appName.uppercase(Locale.getDefault())
+                textSize = 8f
+                letterSpacing = 0.13f
+                setTextColor(0xAFC7BEB0.toInt())
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                includeFontPadding = false
+                maxLines = 1
+            }
+            row.addView(
+                app,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(15)
+                )
+            )
+
+            val title = TextView(this).apply {
+                text = item.title
+                textSize = 14f
+                setTextColor(0xFFF2EEE7.toInt())
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                includeFontPadding = false
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            }
+            row.addView(
+                title,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(21)
+                )
+            )
+
+            if (item.message.isNotBlank()) {
+                val message = TextView(this).apply {
+                    text = item.message
+                    textSize = 11f
+                    setTextColor(0xC6D0C8BE.toInt())
+                    typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+                    includeFontPadding = false
+                    maxLines = 2
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                }
+                row.addView(
+                    message,
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    )
+                )
+            }
+
+            notificationContainer.addView(
+                row,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+
+            if (index < items.lastIndex) {
+                val divider = View(this).apply {
+                    setBackgroundColor(0x28E7D9C8)
+                }
+                notificationContainer.addView(
+                    divider,
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dp(1)
+                    ).apply {
+                        topMargin = dp(3)
+                    }
+                )
+            }
+        }
+    }
+
+    private fun connectMediaSession() {
+        val token = PhantomNotificationListenerService.mediaToken()
+        if (token == activeMediaToken) return
+
+        try {
+            mediaController?.unregisterCallback(mediaCallback)
+        } catch (_: Exception) {
+            // The session may already have disconnected.
+        }
+        mediaController = null
+        activeMediaToken = token
+
+        if (token != null) {
+            try {
+                mediaController = MediaController(this, token).also {
+                    it.registerCallback(mediaCallback, handler)
+                }
+            } catch (_: Exception) {
+                mediaController = null
+                activeMediaToken = null
+            }
+        }
+    }
+
+    private fun updateMediaContent() {
+        if (!::mediaContainer.isInitialized) return
+        val controller = mediaController
+        val metadata = controller?.metadata
+        val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)
+            ?.takeIf { it.isNotBlank() }
+        val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST)
+            ?.takeIf { it.isNotBlank() }
+            ?: metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST)
+                ?.takeIf { it.isNotBlank() }
+
+        if (controller == null || title == null) {
+            mediaContainer.visibility = View.GONE
+            return
+        }
+
+        mediaContainer.visibility = View.VISIBLE
+        mediaTitle.text = title
+        mediaSubtitle.text = artist.orEmpty()
+        mediaPlayPause.text =
+            if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) "Ⅱ" else "▶"
     }
 
     private fun glassSurface(
@@ -632,7 +849,7 @@ class PhantomLockActivity : Activity() {
         val now = Date()
         clockLabel.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(now)
         dateLabel.text = SimpleDateFormat(
-            "EEEE, d MMMM",
+            "EEEE  ·  d MMMM",
             Locale.getDefault()
         ).format(now).uppercase(Locale.getDefault())
     }
@@ -649,6 +866,7 @@ class PhantomLockActivity : Activity() {
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(PhantomOverlayService.ACTION_CLOSE_LOCK)
+            addAction(PhantomNotificationListenerService.ACTION_DATA_CHANGED)
         }
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(screenOffReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -699,42 +917,41 @@ class PhantomLockActivity : Activity() {
             val w = width.toFloat()
             val h = height.toFloat()
 
+            // Matte charcoal-to-ink base with a warm copper atmosphere.
             paint.shader = LinearGradient(
-                0f, 0f, w * 0.82f, h,
+                0f, 0f, w * 0.34f, h,
                 intArrayOf(
-                    Color.rgb(3, 7, 17),
-                    Color.rgb(8, 17, 32),
-                    Color.rgb(5, 9, 21),
-                    Color.rgb(2, 5, 13)
+                    Color.rgb(12, 11, 13),
+                    Color.rgb(22, 17, 18),
+                    Color.rgb(13, 13, 17),
+                    Color.rgb(5, 7, 10)
                 ),
-                floatArrayOf(0f, 0.42f, 0.76f, 1f),
+                floatArrayOf(0f, 0.38f, 0.72f, 1f),
                 Shader.TileMode.CLAMP
             )
             canvas.drawRect(0f, 0f, w, h, paint)
             paint.shader = null
 
-            // Deep blue glass-like light blooming behind the clock.
+            // A soft amber horizon replaces the previous blue glass lighting.
             paint.shader = RadialGradient(
-                w * 0.88f, h * 0.35f, w * 1.05f,
+                w * 0.86f, h * 0.34f, w * 0.78f,
                 intArrayOf(
-                    0x523B8FC0,
-                    0x272C6595,
-                    0x10203B70,
+                    0x55B66A3D,
+                    0x2C83472F,
+                    0x142E2020,
                     Color.TRANSPARENT
                 ),
-                floatArrayOf(0f, 0.34f, 0.67f, 1f),
+                floatArrayOf(0f, 0.32f, 0.66f, 1f),
                 Shader.TileMode.CLAMP
             )
             canvas.drawRect(0f, 0f, w, h, paint)
             paint.shader = null
 
-            // A cooler lower glow gives the fingerprint zone a soft visual anchor.
             paint.shader = RadialGradient(
-                w * 0.16f, h * 0.82f, w * 0.82f,
+                w * 0.08f, h * 0.78f, w * 0.9f,
                 intArrayOf(
-                    0x3A315F92,
-                    0x1E253E73,
-                    0x10202758,
+                    0x302E4653,
+                    0x17202A35,
                     Color.TRANSPARENT
                 ),
                 null,
@@ -743,44 +960,45 @@ class PhantomLockActivity : Activity() {
             canvas.drawRect(0f, 0f, w, h, paint)
             paint.shader = null
 
-            // Very subtle oversized glass geometry in the wallpaper only.
+            // Fine engraved curves are part of the wallpaper, not UI surfaces.
             paint.style = Paint.Style.STROKE
-            paint.strokeWidth = density
-            paint.color = 0x16C3E8FF
-            canvas.drawCircle(w * 1.05f, h * 0.39f, w * 0.66f, paint)
-            paint.color = 0x0FFFFFFF
-            canvas.drawCircle(w * 1.05f, h * 0.39f, w * 0.77f, paint)
-            paint.color = 0x0C8DBBDB
-            canvas.drawCircle(-w * 0.46f, h * 0.88f, w * 0.8f, paint)
+            paint.strokeWidth = density * 0.75f
+            paint.color = 0x18E7B58C
+            canvas.drawCircle(w * 0.91f, h * 0.32f, w * 0.39f, paint)
+            paint.color = 0x10E7B58C
+            canvas.drawCircle(w * 0.91f, h * 0.32f, w * 0.47f, paint)
+            paint.color = 0x0DDFD1C3
+            canvas.drawCircle(w * 0.91f, h * 0.32f, w * 0.56f, paint)
+
+            accentPath.reset()
+            accentPath.moveTo(-w * 0.12f, h * 0.58f)
+            accentPath.cubicTo(
+                w * 0.28f, h * 0.44f,
+                w * 0.56f, h * 0.64f,
+                w * 1.12f, h * 0.46f
+            )
+            paint.color = 0x12E5B28B
+            paint.strokeWidth = density * 1.15f
+            canvas.drawPath(accentPath, paint)
+            accentPath.reset()
+            accentPath.moveTo(-w * 0.1f, h * 0.63f)
+            accentPath.cubicTo(
+                w * 0.31f, h * 0.49f,
+                w * 0.64f, h * 0.7f,
+                w * 1.08f, h * 0.53f
+            )
+            paint.color = 0x0CE5B28B
+            canvas.drawPath(accentPath, paint)
             paint.style = Paint.Style.FILL
 
-            // A fine diagonal light ribbon adds depth without distracting from text.
-            accentPath.reset()
-            accentPath.moveTo(w * 0.73f, 0f)
-            accentPath.lineTo(w, 0f)
-            accentPath.lineTo(w, h * 0.22f)
-            accentPath.close()
+            // Keep the lower edge naturally dark behind the standalone sensor.
             paint.shader = LinearGradient(
-                w * 0.72f, 0f, w, h * 0.22f,
-                intArrayOf(0x00B8E8FF, 0x153F9ACB, 0x003F9ACB),
+                0f, h * 0.73f, 0f, h,
+                intArrayOf(Color.TRANSPARENT, 0x30030305, 0xCC030406.toInt()),
                 null,
                 Shader.TileMode.CLAMP
             )
-            canvas.drawPath(accentPath, paint)
-            paint.shader = null
-
-            // Deepen the bottom edge so the lower controls remain legible.
-            paint.shader = LinearGradient(
-                0f, h * 0.68f, 0f, h,
-                intArrayOf(
-                    Color.TRANSPARENT,
-                    0x3510192D,
-                    0xAA02050D.toInt()
-                ),
-                null,
-                Shader.TileMode.CLAMP
-            )
-            frame.set(0f, h * 0.68f, w, h)
+            frame.set(0f, h * 0.73f, w, h)
             canvas.drawRect(frame, paint)
             paint.shader = null
         }
@@ -790,6 +1008,13 @@ class PhantomLockActivity : Activity() {
         isAlive = false
         handler.removeCallbacksAndMessages(null)
         armRunnable = null
+        try {
+            mediaController?.unregisterCallback(mediaCallback)
+        } catch (_: Exception) {
+            // Session already disconnected.
+        }
+        mediaController = null
+        activeMediaToken = null
         if (receiverRegistered) {
             try {
                 unregisterReceiver(screenOffReceiver)
