@@ -1,29 +1,75 @@
 name: Phantom Lock Android Release
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
-      tag_name:
-        description: "Release version tag (for example v1.0.0)"
+      build_apk:
+        description: "Confirm building and publishing the next Phantom Lock release"
         required: true
-        type: string
+        default: false
+        type: boolean
 
 permissions:
   contents: write
+  actions: read
+
+concurrency:
+  group: phantom-lock-release-apk
+  cancel-in-progress: false
 
 jobs:
   release:
-    name: Build and publish APK
+    if: inputs.build_apk == true
+    name: Build and publish signed APK
     runs-on: ubuntu-latest
-    env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
+    timeout-minutes: 30
 
     steps:
-      - name: Check out source
+      - name: Check out Phantom Lock
         uses: actions/checkout@v4
+
+      - name: Calculate next Phantom Lock release version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release list --limit 1000 --json tagName,isDraft,isPrerelease > releases.json
+          python3 - <<'PY'
+          import json
+          import re
+          import os
+          from pathlib import Path
+
+          releases = json.loads(Path("releases.json").read_text())
+          versions = []
+          for release in releases:
+              if release.get("isDraft") or release.get("isPrerelease"):
+                  continue
+              match = re.fullmatch(r"v?(\\d+)\\.(\\d+)\\.(\\d+)", release.get("tagName", ""))
+              if match:
+                  versions.append(tuple(map(int, match.groups())))
+
+          if not versions:
+              next_version = (1, 0, 0)
+          else:
+              major, minor, patch = max(versions)
+              if patch < 9:
+                  patch += 1
+              else:
+                  patch = 0
+                  if minor < 9:
+                      minor += 1
+                  else:
+                      minor = 0
+                      major += 1
+              next_version = (major, minor, patch)
+
+          version = ".".join(map(str, next_version))
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"app_version={version}\\n")
+          print(f"Next Phantom Lock release version: {version}")
+          PY
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -36,31 +82,110 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Set up Android SDK tools
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          accept-android-sdk-licenses: false
-          packages: ""
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
 
-      - name: Accept licenses and install Android 35
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+
+      - name: Set Phantom Lock Android version
+        env:
+          APP_VERSION: ${{ steps.version.outputs.app_version }}
+          APP_VERSION_CODE: ${{ github.run_number }}
         run: |
-          yes | sdkmanager --licenses
-          yes | sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          import re
 
-      - name: Build release APK
-        run: gradle --no-daemon :app:assembleRelease
+          path = Path("app/build.gradle.kts")
+          text = path.read_text()
+          version = os.environ["APP_VERSION"]
+          version_code = os.environ["APP_VERSION_CODE"]
+          text, code_count = re.subn(r"(?m)^\\s*versionCode = \\d+\\s*$", f"        versionCode = {version_code}", text, count=1)
+          text, name_count = re.subn(r'(?m)^\\s*versionName = "[^"]*"\\s*$', f'        versionName = "{version}"', text, count=1)
+          if code_count != 1 or name_count != 1:
+              raise SystemExit("Could not safely set Phantom Lock versionCode and versionName.")
+          path.write_text(text)
+          print(f"Configured Phantom Lock {version} (versionCode {version_code})")
+          PY
 
-      - name: Rename APK
+      - name: Prepare permanent release signing
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p release
-          cp app/build/outputs/apk/release/app-release-unsigned.apk "release/PhantomLock-${RELEASE_TAG}.apk"
+          set -euo pipefail
+          mkdir -p signing
+          run_id="$(gh run list \
+            --workflow generate-release-keystore.yml \
+            --status success \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId')"
 
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+          if [ -z "$run_id" ]; then
+            echo "::error::No successful Phantom Lock signing-key workflow was found."
+            echo "Run 'Generate Phantom Lock Release Keystore' once before building a release."
+            exit 1
+          fi
+
+          gh run download "$run_id" \
+            --name phantom-lock-release-signing-files \
+            --dir signing
+
+          test -s signing/phantom-lock-release.keystore
+          test -s signing/phantom-lock-signing-credentials.txt
+          cp signing/phantom-lock-release.keystore app/phantom-lock-release.keystore
+
+          set -a
+          source signing/phantom-lock-signing-credentials.txt
+          set +a
+
+          test -n "${ANDROID_KEYSTORE_PASSWORD:-}"
+          test -n "${ANDROID_KEY_ALIAS:-}"
+          test -n "${ANDROID_KEY_PASSWORD:-}"
+
+          cat >> gradle.properties <<EOF
+          PHANTOM_KEYSTORE_FILE=phantom-lock-release.keystore
+          PHANTOM_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD
+          PHANTOM_KEY_ALIAS=$ANDROID_KEY_ALIAS
+          PHANTOM_KEY_PASSWORD=$ANDROID_KEY_PASSWORD
+          EOF
+
+      - name: Build signed Phantom Lock APK
+        run: gradle --no-daemon --stacktrace :app:assembleRelease
+
+      - name: Verify signed APK
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          cp "$APK" "PhantomLock-${{ steps.version.outputs.app_version }}.apk"
+          ls -lh "PhantomLock-${{ steps.version.outputs.app_version }}.apk"
+
+      - name: Upload Phantom Lock production APK
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          target_commitish: main
-          name: Phantom Lock ${{ env.RELEASE_TAG }}
-          generate_release_notes: true
-          files: release/PhantomLock-${{ env.RELEASE_TAG }}.apk
-          fail_on_unmatched_files: true
+          name: phantom-lock-release-apk
+          path: PhantomLock-${{ steps.version.outputs.app_version }}.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Publish Phantom Lock GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APP_VERSION: ${{ steps.version.outputs.app_version }}
+        run: |
+          set -euo pipefail
+          tag="v${APP_VERSION}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "::error::Release $tag already exists. Refusing to overwrite a published version."
+            exit 1
+          fi
+          gh release create "$tag" "PhantomLock-${APP_VERSION}.apk" \
+            --target "$GITHUB_SHA" \
+            --title "Phantom Lock ${APP_VERSION}" \
+            --generate-notes
