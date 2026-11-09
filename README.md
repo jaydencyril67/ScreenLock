@@ -1,17 +1,19 @@
 # Phantom Lock
 
-A minimal, Samsung Galaxy S20-inspired screen-on lock surface for Android, designed for the Galaxy A02 / Android 11.
+A custom Samsung Galaxy S20-inspired lock screen for Android, designed for the Galaxy A02 / Android 11.
 
-## User experience
+## Lock-screen experience
 
-- Phantom appears when the display wakes after the power button is pressed.
-- The lock surface contains only a fingerprint symbol and a small padlock.
-- It has no clock, branding, extra buttons, or default vibration.
-- Tapping the fingerprint before arming shows **“Fingerprint doesn't match”**.
-- Tapping the small padlock silently arms one fingerprint tap. The next fingerprint tap dismisses the lock surface.
-- The armed state is one-use and resets when the screen turns off.
+- Phantom launches immediately on the dynamic screen-on broadcast while protection is enabled.
+- The Activity uses Android's show-when-locked and turn-screen-on behavior to appear above the native keyguard.
+- The lock UI includes a dark atmospheric wallpaper, large live clock, date, battery percentage, a bold fingerprint mark and a small padlock.
+- The imported fingerprint artwork is intentionally shown without a surrounding sensor ring.
+- Tapping the fingerprint before arming displays **“Fingerprint doesn't match”**.
+- Tapping the small padlock silently arms exactly one fingerprint tap.
+- The next fingerprint tap uses Android biometric authentication when strong biometric hardware is enrolled. Otherwise, on the Galaxy A02, the armed tap dismisses the visual lock layer.
+- The armed state resets when the screen turns off.
 
-## Authentication boundary
+## Authentication and hardware boundary
 
 The fingerprint artwork is visual; it does not read touch patterns as biometric data.
 
@@ -29,15 +31,15 @@ The Galaxy A02 does not have a fingerprint reader. On that device, the armed tap
 
 A persistent foreground-service notification provides an emergency **Turn off** action. Protection restores after reboot when it was previously enabled and overlay permission remains granted.
 
-## Android behavior
+## Wake and keyguard behavior
 
-The app dynamically listens for screen-on and screen-off broadcasts. It launches a full-screen Activity using Android's show-when-locked and turn-screen-on window behavior. The user-granted overlay permission is required by this implementation for the screen-on Activity launch from the background.
+The service responds immediately to the dynamic screen-on broadcast without an extra launch delay. Its foreground service and user-granted overlay permission allow the background lock Activity launch. The Activity uses Android's supported show-when-locked and turn-screen-on APIs to appear above the native lock screen.
 
-OEM power management can affect background services. On the Galaxy A02, keep Phantom Lock allowed to run in the background if Samsung's battery controls offer that setting.
+Android and Samsung still control keyguard scheduling, battery restrictions and protected system surfaces. Phantom requests the earliest app-controlled launch, but it cannot replace the operating system's keyguard or guarantee a zero-frame transition on every firmware build.
 
 ## Artwork attribution
 
-The fingerprint and padlock vector drawables are based on Google Material Design Icons, distributed under the Apache License 2.0. See THIRD_PARTY_NOTICES.md. The artwork is an S20-inspired approximation, not Samsung's proprietary firmware asset.
+The fingerprint and padlock vector drawables are based on Google Material Design Icons, distributed under the Apache License 2.0. See THIRD_PARTY_NOTICES.md. The fingerprint artwork is adapted for Phantom's larger, bolder presentation; it is not Samsung's proprietary firmware asset.
 
 ## Build
 
