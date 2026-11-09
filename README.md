@@ -7,7 +7,7 @@ A custom Samsung Galaxy S20-inspired lock screen for Android, designed for the G
 - When the device becomes non-interactive, the foreground service prepares the full-screen lock Activity without turning the display back on.
 - The prepared Activity remains alive with Android's show-when-locked behavior, ready to appear over the native keyguard as the display wakes.
 - The screen-on broadcast is retained as a recovery fallback when the prepared Activity is missing.
-- The lock UI includes a selectable local-photo wallpaper, a redesigned editorial clock, date, battery percentage, a bold fingerprint mark, music controls, and flashlight/camera shortcuts.
+- The lock UI includes a selectable local-photo wallpaper, a premium single-line clock and expanded date, battery percentage, a bold fingerprint mark, a local-file music player, and flashlight/camera shortcuts.
 - The imported fingerprint artwork is intentionally shown without a surrounding sensor ring.
 - Tapping the fingerprint before arming displays **“Fingerprint doesn't match”**.
 - Tapping the small padlock silently arms exactly one fingerprint tap.
@@ -46,12 +46,16 @@ The fingerprint and padlock vector drawables are based on Google Material Design
 
 Phantom Lock uses a dedicated charcoal-and-copper adaptive launcher icon on Android 8.0 and newer.
 
+## Local music and device shortcuts
+
+- The music player uses audio files that the user explicitly selects from the phone's document picker. It supports a multi-track queue, previous, play/pause, next, embedded artwork and track metadata where available.
+- Playback is handled by an independent service, so leaving the lock screen to open the camera or another screen does not immediately destroy the player.
+- Phantom does not inspect other apps' media sessions, request notification-listener access, or display notification previews.
+- The flashlight shortcut checks camera permission before accessing the camera hardware and toggles the device torch. The camera shortcut opens the phone's camera app.
+
 ## Distribution variants
 
-Phantom Lock has two Android build variants because Google's Play Protect blocks unverified apps installed directly from internet sources when they declare notification-listener access.
-
-- **Sideload edition:** used for GitHub Releases. It does not declare or include the notification-listener service, so it avoids that sensitive install-time declaration. The lockscreen, fingerprint interaction, battery, clock, flashlight and camera shortcuts remain available. Third-party music-session controls are omitted from this edition.
-- **Play-distribution edition:** retains the protected notification-listener service solely to obtain active media-session controls. Phantom does not read, store, or display notification content. Android requires this access to control other apps' media sessions. This build is intended for distribution through Google Play, subject to Google's review and policies.
+The sideload and Play build variants now use the same local-file music player. Neither variant declares a notification-listener service or needs notification-listener access. The GitHub debug workflow still builds both variants as a compilation check and publishes the sideload debug APK directly.
 
 ## Build and downloads
 
