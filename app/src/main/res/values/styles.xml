@@ -2,13 +2,21 @@
 <resources>
     <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#9B75FF</item>
-        <item name="android:windowBackground">#070610</item>
+        <item name="android:colorAccent">#9BBAFF</item>
+        <item name="android:windowBackground">#05070F</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:windowNoTitle">true</item>
-        <item name="android:navigationBarColor">#070610</item>
-        <item name="android:statusBarColor">#070610</item>
+        <item name="android:navigationBarColor">#05070F</item>
+        <item name="android:statusBarColor">#05070F</item>
         <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <style name="AuthTransparentTheme" parent="@android:style/Theme.Translucent.NoTitleBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowActionModeOverlay">true</item>
     </style>
 </resources>
