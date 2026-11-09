@@ -64,7 +64,7 @@ class MainActivity : Activity() {
         }
         root.addView(title)
         root.addView(label(
-            "A minimal S20-inspired lock surface that appears when your screen wakes.",
+            "A full-screen S20-inspired lock screen that appears as your display wakes.",
             13f,
             0xFFA4AEC3.toInt(),
             false
@@ -106,7 +106,7 @@ class MainActivity : Activity() {
         root.addView(protectionButton, protectParams)
 
         val note = label(
-            "HOW IT WORKS\nThe screen wakes to only the fingerprint and a small padlock. Tap the fingerprint normally and Phantom says “Fingerprint doesn't match.” Tap the tiny padlock to silently arm one scan; your next fingerprint tap unlocks. No triple tap, clock, vibration or required phone PIN.\n\nOn phones with enrolled fingerprint hardware, Android's genuine biometric prompt is used. The Galaxy A02 has no fingerprint reader, so its armed tap is a visual unlock gesture.",
+            "HOW IT WORKS\nThe screen wakes to a custom lock screen with a large clock, date, dark wallpaper and a bold fingerprint. A small padlock silently arms one fingerprint tap; an ordinary fingerprint tap displays “Fingerprint doesn't match.” No triple tap, vibration or required phone PIN.\n\nOn phones with enrolled fingerprint hardware, Android's genuine biometric prompt is used. The Galaxy A02 has no fingerprint reader, so its armed tap is a visual unlock gesture.",
             12f,
             0xFF8793AD.toInt(),
             false
