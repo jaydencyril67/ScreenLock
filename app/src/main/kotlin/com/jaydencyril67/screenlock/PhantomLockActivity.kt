@@ -13,9 +13,6 @@ import android.hardware.camera2.CameraManager
 import android.graphics.Typeface
 import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
-import android.media.MediaMetadata
-import android.media.session.MediaController
-import android.media.session.PlaybackState
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
@@ -33,6 +30,7 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.net.Uri
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -45,6 +43,7 @@ class PhantomLockActivity : Activity() {
 
     companion object {
         private const val REQUEST_CAMERA_PERMISSION = 4171
+        private const val REQUEST_LOCAL_MUSIC = 4172
         const val ACTION_PREPARE = "com.jaydencyril67.screenlock.action.PREPARE_LOCK"
         const val ACTION_WAKE = "com.jaydencyril67.screenlock.action.WAKE_LOCK"
 
@@ -71,37 +70,20 @@ class PhantomLockActivity : Activity() {
     private lateinit var mediaPlayPause: TextView
     private lateinit var mediaPrevious: TextView
     private lateinit var mediaNext: TextView
+    private lateinit var mediaChoose: TextView
     private var fingerprintView: ImageView? = null
-    private var mediaController: MediaController? = null
-    private var activeMediaToken: android.media.session.MediaSession.Token? = null
     private var externalShortcutLaunched = false
     private var flashEnabled = false
     private var flashCameraId: String? = null
     private lateinit var flashLabel: TextView
 
-    private val mediaCallback = object : MediaController.Callback() {
-        override fun onMetadataChanged(metadata: MediaMetadata?) {
-            updateMediaContent()
-        }
-
-        override fun onPlaybackStateChanged(state: PlaybackState?) {
-            updateMediaContent()
-        }
-
-        override fun onSessionDestroyed() {
-            mediaController = null
-            activeMediaToken = null
-            updateMediaContent()
-        }
-    }
-
     private val clockTick = object : Runnable {
         override fun run() {
             if (::clockLabel.isInitialized) {
                 val now = Date()
-                clockLabel.text = SimpleDateFormat("HH\nmm", Locale.getDefault()).format(now)
+                clockLabel.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(now)
                 dateLabel.text = SimpleDateFormat(
-                    "EEEE  ·  d MMMM",
+                    "EEEE  ·  d MMMM yyyy",
                     Locale.getDefault()
                 ).format(now).uppercase(Locale.getDefault())
             }
@@ -135,7 +117,7 @@ class PhantomLockActivity : Activity() {
                     }
                 }
 
-                PhantomNotificationData.ACTION_DATA_CHANGED -> refreshDynamicContent()
+                LocalMusicPlaybackService.ACTION_STATE_CHANGED -> refreshDynamicContent()
 
                 PhantomOverlayService.ACTION_CLOSE_LOCK -> {
                     armed = false
@@ -267,32 +249,32 @@ class PhantomLockActivity : Activity() {
         )
 
         clockLabel = TextView(this).apply {
-            text = SimpleDateFormat("HH\nmm", Locale.getDefault()).format(Date())
-            textSize = 67f
-            setTextColor(0xFFF5F1EA.toInt())
+            text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+            textSize = 78f
+            setTextColor(0xFFF7F2E9.toInt())
             typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
             gravity = Gravity.START or Gravity.CENTER_VERTICAL
             includeFontPadding = false
-            letterSpacing = -0.045f
-            setShadowLayer(dp(18).toFloat(), 0f, dp(4).toFloat(), 0x775D3925)
+            letterSpacing = -0.055f
+            setShadowLayer(dp(20).toFloat(), 0f, dp(4).toFloat(), 0x885D3925)
         }
         root.addView(
             clockLabel,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(170),
+                dp(112),
                 Gravity.TOP or Gravity.START
             ).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.105f).toInt()
+                topMargin = (resources.displayMetrics.heightPixels * 0.115f).toInt()
                 marginStart = dp(25)
-                marginEnd = dp(20)
+                marginEnd = dp(18)
             }
         )
 
         dateLabel = TextView(this).apply {
-            textSize = 12f
-            letterSpacing = 0.11f
-            setTextColor(0xD9D6CFC5.toInt())
+            textSize = 11f
+            letterSpacing = 0.15f
+            setTextColor(0xE7D9C7B5.toInt())
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             gravity = Gravity.START
             includeFontPadding = false
@@ -301,30 +283,30 @@ class PhantomLockActivity : Activity() {
             dateLabel,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(28),
+                dp(26),
                 Gravity.TOP or Gravity.START
             ).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.34f).toInt()
+                topMargin = (resources.displayMetrics.heightPixels * 0.265f).toInt()
                 marginStart = dp(29)
                 marginEnd = dp(20)
             }
         )
 
         val dateRule = View(this).apply {
-            setBackgroundColor(0x70D1B38A)
+            setBackgroundColor(0x90D1B38A.toInt())
         }
         root.addView(
             dateRule,
-            FrameLayout.LayoutParams(dp(54), dp(1), Gravity.TOP or Gravity.START).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.385f).toInt()
+            FrameLayout.LayoutParams(dp(62), dp(1), Gravity.TOP or Gravity.START).apply {
+                topMargin = (resources.displayMetrics.heightPixels * 0.305f).toInt()
                 marginStart = dp(30)
             }
         )
 
         val dateCaption = TextView(this).apply {
-            text = "YOUR DAY  ·  YOUR DEVICE"
+            text = "LOCAL TIME  ·  24-HOUR FORMAT"
             textSize = 8f
-            letterSpacing = 0.19f
+            letterSpacing = 0.18f
             setTextColor(0xAFCFC6B8.toInt())
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             includeFontPadding = false
@@ -336,7 +318,7 @@ class PhantomLockActivity : Activity() {
                 dp(20),
                 Gravity.TOP or Gravity.START
             ).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.398f).toInt()
+                topMargin = (resources.displayMetrics.heightPixels * 0.322f).toInt()
                 marginStart = dp(30)
             }
         )
@@ -355,7 +337,7 @@ class PhantomLockActivity : Activity() {
             setPadding(0, dp(13), 0, 0)
         }
         val mediaHeading = TextView(this).apply {
-            text = "NOW PLAYING"
+            text = "LOCAL MUSIC"
             textSize = 9f
             letterSpacing = 0.2f
             setTextColor(0xAFC7BEB0.toInt())
@@ -434,18 +416,13 @@ class PhantomLockActivity : Activity() {
             setPadding(0, dp(4), 0, 0)
         }
         mediaPrevious = mediaControl("‹", "Previous track") {
-            mediaController?.transportControls?.skipToPrevious()
+            sendMusicCommand(LocalMusicPlaybackService.ACTION_PREVIOUS)
         }
-        mediaPlayPause = mediaControl("Ⅱ", "Play or pause") {
-            val controller = mediaController ?: return@mediaControl
-            if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
-                controller.transportControls.pause()
-            } else {
-                controller.transportControls.play()
-            }
+        mediaPlayPause = mediaControl("▶", "Play or pause") {
+            sendMusicCommand(LocalMusicPlaybackService.ACTION_TOGGLE)
         }
         mediaNext = mediaControl("›", "Next track") {
-            mediaController?.transportControls?.skipToNext()
+            sendMusicCommand(LocalMusicPlaybackService.ACTION_NEXT)
         }
         mediaControls.addView(mediaPrevious, LinearLayout.LayoutParams(dp(48), dp(38)))
         mediaControls.addView(mediaPlayPause, LinearLayout.LayoutParams(dp(48), dp(38)))
@@ -455,6 +432,27 @@ class PhantomLockActivity : Activity() {
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 dp(42)
+            )
+        )
+
+        mediaChoose = TextView(this).apply {
+            text = "CHOOSE MUSIC FROM PHONE"
+            textSize = 9f
+            letterSpacing = 0.16f
+            setTextColor(0xFFE0BE91.toInt())
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            includeFontPadding = false
+            setPadding(0, dp(8), 0, dp(2))
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Choose local music files"
+            setOnClickListener { openLocalMusicPicker() }
+        }
+        mediaContainer.addView(
+            mediaChoose,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(27)
             )
         )
         contentStack.addView(
@@ -472,7 +470,7 @@ class PhantomLockActivity : Activity() {
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.TOP or Gravity.START
             ).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.46f).toInt()
+                topMargin = (resources.displayMetrics.heightPixels * 0.395f).toInt()
                 marginStart = dp(29)
                 marginEnd = dp(31)
             }
@@ -628,87 +626,149 @@ class PhantomLockActivity : Activity() {
     }
 
     private fun refreshDynamicContent() {
-        if (!::mediaContainer.isInitialized) return
-        connectMediaSession()
         updateMediaContent()
-    }
-
-    private fun connectMediaSession() {
-        val token = PhantomNotificationData.mediaToken()
-        if (token == activeMediaToken) return
-
-        try {
-            mediaController?.unregisterCallback(mediaCallback)
-        } catch (_: Exception) {
-            // The session may already have disconnected.
-        }
-        mediaController = null
-        activeMediaToken = token
-
-        if (token != null) {
-            try {
-                mediaController = MediaController(this, token).also {
-                    it.registerCallback(mediaCallback, handler)
-                }
-            } catch (_: Exception) {
-                mediaController = null
-                activeMediaToken = null
-            }
-        }
     }
 
     private fun updateMediaContent() {
         if (!::mediaContainer.isInitialized) return
-        val controller = mediaController
-        val metadata = controller?.metadata
-        val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)
-            ?.takeIf { it.isNotBlank() }
-        val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST)
-            ?.takeIf { it.isNotBlank() }
-            ?: metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST)
-                ?.takeIf { it.isNotBlank() }
-
-        if (controller == null || title == null) {
-            mediaContainer.visibility = View.VISIBLE
-            mediaTitle.text = if (BuildConfig.HAS_NOTIFICATION_ACCESS) {
-                "Nothing playing"
-            } else {
-                "Music controls unavailable"
-            }
-            mediaSubtitle.text = if (BuildConfig.HAS_NOTIFICATION_ACCESS) {
-                "Start music on your phone"
-            } else {
-                "Android media access is not included in this edition"
-            }
-            mediaArtwork.setImageResource(R.drawable.ic_music_note)
-            mediaPlayPause.text = "▶"
-            mediaPrevious.isEnabled = false
-            mediaPrevious.alpha = 0.35f
-            mediaPlayPause.isEnabled = false
-            mediaPlayPause.alpha = 0.35f
-            mediaNext.isEnabled = false
-            mediaNext.alpha = 0.35f
-            return
-        }
+        val prefs = getSharedPreferences(LocalMusicPlaybackService.PREFS, MODE_PRIVATE)
+        val queue = prefs.getString(LocalMusicPlaybackService.KEY_QUEUE, "")
+            .orEmpty()
+            .lineSequence()
+            .filter { it.isNotBlank() }
+            .toList()
+        val index = prefs.getInt(LocalMusicPlaybackService.KEY_INDEX, 0)
+            .coerceIn(0, (queue.size - 1).coerceAtLeast(0))
+        val playing = prefs.getBoolean(LocalMusicPlaybackService.KEY_PLAYING, false)
 
         mediaContainer.visibility = View.VISIBLE
-        mediaTitle.text = title
-        mediaSubtitle.text = artist.orEmpty()
-        mediaPrevious.isEnabled = true
-        mediaPrevious.alpha = 1f
-        mediaPlayPause.isEnabled = true
-        mediaPlayPause.alpha = 1f
-        mediaNext.isEnabled = true
-        mediaNext.alpha = 1f
-        val artwork = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
-            ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
-        if (artwork != null) {
-            mediaArtwork.setImageBitmap(artwork)
-        } else {
+        if (queue.isEmpty()) {
+            mediaTitle.text = "Your local music"
+            mediaSubtitle.text = "Choose audio stored on this phone"
             mediaArtwork.setImageResource(R.drawable.ic_music_note)
+            mediaChoose.text = "CHOOSE MUSIC FROM PHONE"
+        } else {
+            mediaTitle.text = prefs.getString(
+                LocalMusicPlaybackService.KEY_TITLE,
+                "Loading selected track…"
+            )
+            mediaSubtitle.text = prefs.getString(
+                LocalMusicPlaybackService.KEY_ARTIST,
+                "LOCAL AUDIO"
+            )
+            mediaChoose.text = "CHANGE LOCAL MUSIC"
+            val bitmap = try {
+                val retriever = android.media.MediaMetadataRetriever()
+                retriever.setDataSource(this, Uri.parse(queue[index]))
+                val bytes = retriever.embeddedPicture
+                retriever.release()
+                if (bytes != null) {
+                    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                } else null
+            } catch (_: Exception) {
+                null
+            }
+            if (bitmap != null) {
+                mediaArtwork.setImageBitmap(bitmap)
+            } else {
+                mediaArtwork.setImageResource(R.drawable.ic_music_note)
+            }
         }
-        mediaPlayPause.text =
-            if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) "Ⅱ" else "▶"
+
+        val hasMusic = queue.isNotEmpty()
+        mediaPrevious.isEnabled = hasMusic
+        mediaPrevious.alpha = if (hasMusic) 1f else 0.35f
+        mediaPlayPause.isEnabled = hasMusic
+        mediaPlayPause.alpha = if (hasMusic) 1f else 0.35f
+        mediaNext.isEnabled = hasMusic
+        mediaNext.alpha = if (hasMusic) 1f else 0.35f
+        mediaPlayPause.text = if (playing) "Ⅱ" else "▶"
+    }
+
+    private fun sendMusicCommand(action: String) {
+        try {
+            startService(
+                Intent(this, LocalMusicPlaybackService::class.java).setAction(action)
+            )
+        } catch (_: Exception) {
+            android.widget.Toast.makeText(
+                this,
+                "Could not control local music.",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun openLocalMusicPicker() {
+        val picker = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "audio/*"
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+            )
+        }
+        externalShortcutLaunched = true
+        try {
+            startActivityForResult(picker, REQUEST_LOCAL_MUSIC)
+        } catch (_: Exception) {
+            externalShortcutLaunched = false
+            android.widget.Toast.makeText(
+                this,
+                "No audio file picker is available on this device.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_LOCAL_MUSIC) return
+        externalShortcutLaunched = false
+        if (resultCode != RESULT_OK || data == null) return
+
+        val selected = mutableListOf<Uri>()
+        val clip = data.clipData
+        if (clip != null) {
+            for (index in 0 until clip.itemCount) {
+                clip.getItemAt(index).uri?.let(selected::add)
+            }
+        } else {
+            data.data?.let(selected::add)
+        }
+
+        val uris = selected.distinct()
+        if (uris.isEmpty()) return
+
+        uris.forEach { uri ->
+            try {
+                contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: SecurityException) {
+                // Some document providers grant temporary access only.
+            }
+        }
+
+        val uriStrings = ArrayList(uris.map { it.toString() })
+        val playerIntent = Intent(this, LocalMusicPlaybackService::class.java).apply {
+            action = LocalMusicPlaybackService.ACTION_SET_QUEUE
+            putStringArrayListExtra(LocalMusicPlaybackService.EXTRA_QUEUE, uriStrings)
+        }
+        try {
+            startService(playerIntent)
+            handler.postDelayed({ updateMediaContent() }, 250L)
+        } catch (_: Exception) {
+            android.widget.Toast.makeText(
+                this,
+                "Could not start the local music player.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
     }
 
     private fun shortcutButton(
@@ -748,6 +808,13 @@ class PhantomLockActivity : Activity() {
     }
 
     private fun toggleFlashlight() {
+        if (checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                arrayOf(android.Manifest.permission.CAMERA),
+                REQUEST_CAMERA_PERMISSION
+            )
+            return
+        }
         val manager = getSystemService(CAMERA_SERVICE) as CameraManager
         try {
             val cameraId = flashCameraId ?: manager.cameraIdList.firstOrNull { id ->
@@ -761,14 +828,6 @@ class PhantomLockActivity : Activity() {
                     this, "Flashlight is not available on this device.",
                     android.widget.Toast.LENGTH_SHORT
                 ).show()
-                return
-            }
-
-            if (checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(
-                    arrayOf(android.Manifest.permission.CAMERA),
-                    REQUEST_CAMERA_PERMISSION
-                )
                 return
             }
 
@@ -806,7 +865,10 @@ class PhantomLockActivity : Activity() {
     }
 
     private fun launchCamera() {
-        val cameraIntent = Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE)
+        var cameraIntent = Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
+        if (cameraIntent.resolveActivity(packageManager) == null) {
+            cameraIntent = Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE)
+        }
         if (cameraIntent.resolveActivity(packageManager) == null) {
             android.widget.Toast.makeText(
                 this, "No camera app is available.",
@@ -982,9 +1044,9 @@ class PhantomLockActivity : Activity() {
 
     private fun updateClock() {
         val now = Date()
-        clockLabel.text = SimpleDateFormat("HH\nmm", Locale.getDefault()).format(now)
+        clockLabel.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(now)
         dateLabel.text = SimpleDateFormat(
-            "EEEE  ·  d MMMM",
+            "EEEE  ·  d MMMM yyyy",
             Locale.getDefault()
         ).format(now).uppercase(Locale.getDefault())
     }
@@ -1001,7 +1063,7 @@ class PhantomLockActivity : Activity() {
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(PhantomOverlayService.ACTION_CLOSE_LOCK)
-            addAction(PhantomNotificationData.ACTION_DATA_CHANGED)
+            addAction(LocalMusicPlaybackService.ACTION_STATE_CHANGED)
         }
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(screenOffReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -1065,13 +1127,6 @@ class PhantomLockActivity : Activity() {
         isAlive = false
         handler.removeCallbacksAndMessages(null)
         armRunnable = null
-        try {
-            mediaController?.unregisterCallback(mediaCallback)
-        } catch (_: Exception) {
-            // Session already disconnected.
-        }
-        mediaController = null
-        activeMediaToken = null
         if (flashEnabled) {
             try {
                 flashCameraId?.let {
