@@ -2,11 +2,12 @@ package com.jaydencyril67.screenlock
 
 import android.app.Notification
 import android.app.PendingIntent
-import android.app.Service
 import android.app.KeyguardManager
+import android.content.ComponentName
 import android.content.Intent
 import android.media.session.MediaSession
-import android.os.IBinder
+import android.media.session.MediaSessionManager
+import android.media.session.PlaybackState
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 
@@ -78,13 +79,29 @@ class PhantomNotificationListenerService : NotificationListenerService() {
 
         val mediaItems = active.sortedByDescending { it.postTime }
         var selectedToken: MediaSession.Token? = null
-        for (sbn in mediaItems) {
-            val extras = sbn.notification.extras ?: continue
-            @Suppress("DEPRECATION")
-            val token = extras.getParcelable(Notification.EXTRA_MEDIA_SESSION) as? MediaSession.Token
-            if (token != null) {
-                selectedToken = token
-                break
+        // Prefer Android's active media sessions so apps without a visible
+        // MediaStyle notification can still expose working playback controls.
+        try {
+            val manager = getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
+            val listener = ComponentName(this, PhantomNotificationListenerService::class.java)
+            val sessions = manager.getActiveSessions(listener)
+            val activeSession = sessions.firstOrNull {
+                it.playbackState?.state == PlaybackState.STATE_PLAYING
+            } ?: sessions.firstOrNull { it.metadata != null }
+            selectedToken = activeSession?.sessionToken
+        } catch (_: Exception) {
+            // Fall back to the media-session token carried by notifications.
+        }
+
+        if (selectedToken == null) {
+            for (sbn in mediaItems) {
+                val extras = sbn.notification.extras ?: continue
+                @Suppress("DEPRECATION")
+                val token = extras.getParcelable(Notification.EXTRA_MEDIA_SESSION) as? MediaSession.Token
+                if (token != null) {
+                    selectedToken = token
+                    break
+                }
             }
         }
         cachedMediaToken = selectedToken
@@ -154,5 +171,4 @@ class PhantomNotificationListenerService : NotificationListenerService() {
         sendBroadcast(Intent(ACTION_DATA_CHANGED).setPackage(packageName))
     }
 
-    override fun onBind(intent: Intent?): IBinder? = super.onBind(intent)
 }
