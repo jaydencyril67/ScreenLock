@@ -575,7 +575,7 @@ class PhantomLockActivity : Activity() {
         )
 
         val shortcutRow = FrameLayout(this)
-        val flashShortcut = shortcutButton("ϟ", "FLASHLIGHT") {
+        val flashShortcut = shortcutButton(R.drawable.ic_flashlight_shortcut, "FLASHLIGHT") {
             toggleFlashlight()
         }
         flashLabel = flashShortcut.second
@@ -583,7 +583,7 @@ class PhantomLockActivity : Activity() {
             flashShortcut.first,
             FrameLayout.LayoutParams(dp(78), dp(64), Gravity.BOTTOM or Gravity.START)
         )
-        val cameraShortcut = shortcutButton("◎", "CAMERA") {
+        val cameraShortcut = shortcutButton(R.drawable.ic_camera_shortcut, "CAMERA") {
             launchCamera()
         }
         shortcutRow.addView(
@@ -686,7 +686,7 @@ class PhantomLockActivity : Activity() {
     }
 
     private fun shortcutButton(
-        glyph: String,
+        iconResource: Int,
         caption: String,
         action: () -> Unit
     ): Pair<View, TextView> {
@@ -697,13 +697,11 @@ class PhantomLockActivity : Activity() {
             isFocusable = true
             setOnClickListener { action() }
         }
-        val icon = TextView(this).apply {
-            text = glyph
-            textSize = 30f
-            setTextColor(0xFFF4F0E9.toInt())
-            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
-            gravity = Gravity.CENTER
-            includeFontPadding = false
+        val icon = ImageView(this).apply {
+            setImageResource(iconResource)
+            imageTintList = ColorStateList.valueOf(0xFFF4F0E9.toInt())
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            contentDescription = caption
         }
         val label = TextView(this).apply {
             text = caption
