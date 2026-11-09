@@ -1,6 +1,7 @@
 package com.jaydencyril67.screenlock
 
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
@@ -22,6 +23,7 @@ class MainActivity : Activity() {
     private lateinit var statusTitle: TextView
     private lateinit var statusDetails: TextView
     private lateinit var overlayButton: Button
+    private lateinit var notificationAccessButton: Button
     private lateinit var protectionButton: Button
 
     private val prefs by lazy {
@@ -100,6 +102,16 @@ class MainActivity : Activity() {
         overlayButton.setOnClickListener { requestOverlayPermission() }
         root.addView(overlayButton, buttonParams())
 
+        notificationAccessButton = actionButton(
+            "ALLOW NOTIFICATIONS & MUSIC",
+            0xFF34313A.toInt()
+        )
+        notificationAccessButton.setOnClickListener { requestNotificationAccess() }
+        root.addView(
+            notificationAccessButton,
+            buttonParams().apply { topMargin = dp(12) }
+        )
+
         protectionButton = actionButton("ACTIVATE PHANTOM LOCK", 0xFF526ED6.toInt())
         protectionButton.setOnClickListener { toggleProtection() }
         val protectParams = buttonParams().apply { topMargin = dp(18) }
@@ -139,6 +151,12 @@ class MainActivity : Activity() {
             "DISPLAY OVER OTHER APPS  ·  ALLOWED"
         } else {
             "ALLOW DISPLAY OVER OTHER APPS"
+        }
+
+        notificationAccessButton.text = if (notificationAccessGranted()) {
+            "NOTIFICATIONS & MUSIC  ·  ALLOWED"
+        } else {
+            "ALLOW NOTIFICATIONS & MUSIC"
         }
 
         when {
@@ -185,6 +203,40 @@ class MainActivity : Activity() {
             )
         } catch (_: Exception) {
             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
+        }
+    }
+
+    private fun notificationAccessGranted(): Boolean {
+        val enabled = Settings.Secure.getString(
+            contentResolver,
+            Settings.Secure.ENABLED_NOTIFICATION_LISTENERS
+        ).orEmpty()
+
+        return enabled.split(':').any { entry ->
+            val component = ComponentName.unflattenFromString(entry)
+            component?.packageName == packageName &&
+                component.className == "$packageName.PhantomNotificationListenerService"
+        }
+    }
+
+    private fun requestNotificationAccess() {
+        if (notificationAccessGranted()) {
+            Toast.makeText(
+                this,
+                "Notification access is already enabled.",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        try {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        } catch (_: Exception) {
+            Toast.makeText(
+                this,
+                "Open Android Settings and enable notification access for ScreenLock.",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
