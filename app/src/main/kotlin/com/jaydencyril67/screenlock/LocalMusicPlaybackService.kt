@@ -253,7 +253,7 @@ class LocalMusicPlaybackService : Service() {
                 null
             }
         }
-        val cleanTitle = title?.substringBeforeLast('.', title)?.takeIf { it.isNotBlank() }
+        val cleanTitle = title?.substringBeforeLast('.')?.takeIf { it.isNotBlank() }
             ?: "Local audio"
         return cleanTitle to (artist?.takeIf { it.isNotBlank() } ?: "LOCAL AUDIO")
     }
