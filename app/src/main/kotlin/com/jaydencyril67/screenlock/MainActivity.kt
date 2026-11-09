@@ -1,7 +1,6 @@
 package com.jaydencyril67.screenlock
 
 import android.app.Activity
-import android.app.KeyguardManager
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
@@ -23,7 +22,6 @@ class MainActivity : Activity() {
     private lateinit var statusTitle: TextView
     private lateinit var statusDetails: TextView
     private lateinit var overlayButton: Button
-    private lateinit var securityButton: Button
     private lateinit var protectionButton: Button
 
     private val prefs by lazy {
@@ -56,7 +54,7 @@ class MainActivity : Activity() {
         scroll.addView(root)
         setContentView(scroll)
 
-        val eyebrow = label("PHANTOM  /  SYSTEM SECURITY", 10f, 0xFF8CA7D9.toInt(), true)
+        val eyebrow = label("PHANTOM  /  SCREEN SECURITY", 10f, 0xFF8CA7D9.toInt(), true)
         eyebrow.letterSpacing = 0.18f
         root.addView(eyebrow)
 
@@ -66,7 +64,7 @@ class MainActivity : Activity() {
         }
         root.addView(title)
         root.addView(label(
-            "A second lock layer that appears after your normal Android unlock.",
+            "A minimal S20-inspired lock surface that appears when your screen wakes.",
             13f,
             0xFFA4AEC3.toInt(),
             false
@@ -80,7 +78,7 @@ class MainActivity : Activity() {
         val statusEyebrow = label("PROTECTION STATUS", 9f, 0xFF91A7D0.toInt(), true)
         statusEyebrow.letterSpacing = 0.16f
         statusCard.addView(statusEyebrow)
-        statusTitle = label("Checking security…", 19f, Color.WHITE, true).apply {
+        statusTitle = label("Checking setup…", 19f, Color.WHITE, true).apply {
             setPadding(0, dp(9), 0, dp(5))
         }
         statusCard.addView(statusTitle)
@@ -102,20 +100,13 @@ class MainActivity : Activity() {
         overlayButton.setOnClickListener { requestOverlayPermission() }
         root.addView(overlayButton, buttonParams())
 
-        securityButton = actionButton("SET UP ANDROID SCREEN LOCK", 0xFF243B63.toInt())
-        securityButton.setOnClickListener {
-            startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
-        }
-        val securityParams = buttonParams().apply { topMargin = dp(10) }
-        root.addView(securityButton, securityParams)
-
         protectionButton = actionButton("ACTIVATE PHANTOM LOCK", 0xFF526ED6.toInt())
         protectionButton.setOnClickListener { toggleProtection() }
         val protectParams = buttonParams().apply { topMargin = dp(18) }
         root.addView(protectionButton, protectParams)
 
         val note = label(
-            "HOW IT WORKS\nYour Samsung lock screen stays in place. After you unlock the phone, Phantom displays a full-screen S20-inspired layer. Triple-tap its fingerprint mark to open Android's genuine biometric or device-credential prompt.",
+            "HOW IT WORKS\nThe screen wakes to only the fingerprint and a small padlock. Tap the fingerprint normally and Phantom says “Fingerprint doesn't match.” Tap the tiny padlock to silently arm one scan; your next fingerprint tap unlocks. No triple tap, clock, vibration or required phone PIN.\n\nOn phones with enrolled fingerprint hardware, Android's genuine biometric prompt is used. The Galaxy A02 has no fingerprint reader, so its armed tap is a visual unlock gesture.",
             12f,
             0xFF8793AD.toInt(),
             false
@@ -126,12 +117,12 @@ class MainActivity : Activity() {
         root.addView(note)
 
         val foot = label(
-            "NO FAKE FINGERPRINT SCANS  •  NO CUSTOM PIN STORAGE",
+            "ONE TAP TO FAIL  ·  PADLOCK TO ARM  ·  ONE TAP TO OPEN",
             9f,
             0xFF596985.toInt(),
             true
         ).apply {
-            letterSpacing = 0.08f
+            letterSpacing = 0.05f
             setPadding(0, dp(24), 0, 0)
             gravity = Gravity.CENTER
         }
@@ -142,7 +133,6 @@ class MainActivity : Activity() {
 
     private fun refreshDashboard() {
         val overlayGranted = Settings.canDrawOverlays(this)
-        val secure = (getSystemService(KEYGUARD_SERVICE) as KeyguardManager).isDeviceSecure
         val enabled = prefs.getBoolean(PhantomOverlayService.PREF_ENABLED, false)
 
         overlayButton.text = if (overlayGranted) {
@@ -150,32 +140,30 @@ class MainActivity : Activity() {
         } else {
             "ALLOW DISPLAY OVER OTHER APPS"
         }
-        securityButton.visibility = if (secure) View.GONE else View.VISIBLE
 
         when {
             !overlayGranted -> {
                 statusTitle.text = "Permission needed"
                 statusTitle.setTextColor(0xFFFFCF88.toInt())
-                statusDetails.text = "Grant overlay access so the lock layer can appear over apps."
-            }
-            !secure -> {
-                statusTitle.text = "Screen lock not configured"
-                statusTitle.setTextColor(0xFFFFCF88.toInt())
-                statusDetails.text = "Set a PIN, pattern or password first. Android will verify it."
+                statusDetails.text = "Allow Phantom Lock to display over other apps so it can appear when the screen wakes."
             }
             enabled -> {
                 statusTitle.text = "Phantom protection enabled"
                 statusTitle.setTextColor(0xFF9FE6C4.toInt())
-                statusDetails.text = "The lock layer appears after each successful device unlock. Use the notification's Turn off action to disable it."
+                statusDetails.text = "Waiting for the next screen wake. Use the persistent notification's Turn off action to disable it."
             }
             else -> {
-                statusTitle.text = "Ready to protect"
+                statusTitle.text = "Ready to activate"
                 statusTitle.setTextColor(0xFFB9C9F4.toInt())
-                statusDetails.text = "Overlay access and Android's secure screen lock are ready."
+                statusDetails.text = "No Android PIN, pattern or password setup is required by Phantom Lock."
             }
         }
 
-        protectionButton.text = if (enabled) "TURN OFF PHANTOM LOCK" else "ACTIVATE PHANTOM LOCK"
+        protectionButton.text = if (enabled) {
+            "TURN OFF PHANTOM LOCK"
+        } else {
+            "ACTIVATE PHANTOM LOCK"
+        }
         protectionButton.background = rounded(
             if (enabled) 0xFF563044.toInt() else 0xFF526ED6.toInt(),
             18f
@@ -189,11 +177,12 @@ class MainActivity : Activity() {
         }
 
         try {
-            val intent = Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:$packageName")
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
             )
-            startActivity(intent)
         } catch (_: Exception) {
             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
         }
@@ -216,25 +205,20 @@ class MainActivity : Activity() {
             return
         }
 
-        val keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
-        if (!keyguard.isDeviceSecure) {
-            Toast.makeText(
-                this,
-                "Set a PIN, pattern or password before activating Phantom Lock.",
-                Toast.LENGTH_LONG
-            ).show()
-            startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
-            return
-        }
-
         val intent = Intent(this, PhantomOverlayService::class.java)
             .setAction(PhantomOverlayService.ACTION_START)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent)
         } else {
             startService(intent)
         }
-        Toast.makeText(this, "Phantom Lock protection activated.", Toast.LENGTH_SHORT).show()
+
+        Toast.makeText(
+            this,
+            "Phantom Lock activated. Turn your screen off and on to test it.",
+            Toast.LENGTH_LONG
+        ).show()
         finish()
     }
 
