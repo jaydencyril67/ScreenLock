@@ -161,14 +161,6 @@ jobs:
           cp "$APK" "PhantomLock-${{ steps.version.outputs.app_version }}.apk"
           ls -lh "PhantomLock-${{ steps.version.outputs.app_version }}.apk"
 
-      - name: Upload Phantom Lock production APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: phantom-lock-release-apk
-          path: PhantomLock-${{ steps.version.outputs.app_version }}.apk
-          if-no-files-found: error
-          retention-days: 7
-
       - name: Publish Phantom Lock GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
