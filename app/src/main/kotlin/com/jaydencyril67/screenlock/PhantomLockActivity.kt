@@ -16,7 +16,6 @@ import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
 import android.media.MediaMetadata
@@ -101,7 +100,7 @@ class PhantomLockActivity : Activity() {
                 val now = Date()
                 clockLabel.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(now)
                 dateLabel.text = SimpleDateFormat(
-                    "EEEE, d MMMM",
+                    "EEEE  ·  d MMMM",
                     Locale.getDefault()
                 ).format(now).uppercase(Locale.getDefault())
             }
@@ -750,7 +749,7 @@ class PhantomLockActivity : Activity() {
 
         try {
             val prompt = BiometricPrompt.Builder(this)
-                .setTitle("Unlock Phantom Lock")
+                .setTitle("Verify fingerprint")
                 .setSubtitle("Touch the fingerprint sensor")
                 .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
                 .setNegativeButton(
