@@ -214,7 +214,8 @@ class MainActivity : Activity() {
 
         return enabled.split(':').any { entry ->
             val component = ComponentName.unflattenFromString(entry)
-            component?.packageName == packageName &&
+            component != null &&
+                component.packageName == packageName &&
                 component.className == "$packageName.PhantomNotificationListenerService"
         }
     }
