@@ -10,7 +10,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.PixelFormat
-import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
