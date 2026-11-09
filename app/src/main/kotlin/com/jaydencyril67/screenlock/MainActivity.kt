@@ -191,7 +191,7 @@ class MainActivity : Activity() {
             enabled -> {
                 statusTitle.text = "Phantom protection enabled"
                 statusTitle.setTextColor(0xFF9FE6C4.toInt())
-                statusDetails.text = "Phantom prepares its lock window as the display sleeps, then keeps it ready over the keyguard. The persistent notification can turn protection off."
+                statusDetails.text = "Phantom keeps running in the background. The notification is status-only; use the control in this app to turn protection off."
             }
             else -> {
                 statusTitle.text = "Ready to activate"
@@ -322,6 +322,10 @@ class MainActivity : Activity() {
     private fun toggleProtection() {
         val enabled = prefs.getBoolean(PhantomOverlayService.PREF_ENABLED, false)
         if (enabled) {
+            // Persist the user's in-app shutdown choice before asking the service to stop.
+            prefs.edit()
+                .putBoolean(PhantomOverlayService.PREF_ENABLED, false)
+                .commit()
             startService(
                 Intent(this, PhantomOverlayService::class.java)
                     .setAction(PhantomOverlayService.ACTION_STOP)
@@ -336,13 +340,31 @@ class MainActivity : Activity() {
             return
         }
 
+        // Save activation synchronously so it survives process death or a fast reboot.
+        prefs.edit()
+            .putBoolean(PhantomOverlayService.PREF_ENABLED, true)
+            .commit()
+
         val intent = Intent(this, PhantomOverlayService::class.java)
             .setAction(PhantomOverlayService.ACTION_START)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+        } catch (error: Exception) {
+            prefs.edit()
+                .putBoolean(PhantomOverlayService.PREF_ENABLED, false)
+                .commit()
+            Toast.makeText(
+                this,
+                "Phantom Lock could not start. Please try activating it again.",
+                Toast.LENGTH_LONG
+            ).show()
+            refreshDashboard()
+            return
         }
 
         Toast.makeText(
