@@ -19,8 +19,8 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
+import android.media.MediaMetadata
 import android.media.session.MediaController
-import android.media.session.MediaMetadata
 import android.media.session.PlaybackState
 import android.os.BatteryManager
 import android.os.Build
