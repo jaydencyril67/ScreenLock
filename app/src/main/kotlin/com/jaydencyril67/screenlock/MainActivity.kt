@@ -118,11 +118,11 @@ class MainActivity : Activity() {
         root.addView(protectionButton, protectParams)
 
         val note = label(
-            "HOW IT WORKS\nWhen the display goes to sleep, Phantom prepares its full-screen lock window without turning the display back on. When you wake the phone, the prepared window is already in place over the lockscreen. A screen-on launch remains as a recovery fallback.\n\nA small padlock silently arms one fingerprint tap. An ordinary fingerprint tap displays “Fingerprint doesn't match” with haptic feedback. On phones with enrolled fingerprint hardware, Android's genuine biometric prompt is used. The Galaxy A02 has no fingerprint reader, so its armed tap is a visual unlock gesture.\\n\\n" +
+            "HOW IT WORKS\nWhen the display goes to sleep, Phantom prepares its full-screen lock window without turning the display back on. When you wake the phone, the prepared window is already in place over the lockscreen. A screen-on launch remains as a recovery fallback.\n\nA small padlock silently arms one fingerprint tap. An ordinary fingerprint tap displays “Fingerprint doesn't match” with haptic feedback. On phones with enrolled fingerprint hardware, Android's genuine biometric prompt is used. The Galaxy A02 has no fingerprint reader, so its armed tap is a visual unlock gesture.\n\n" +
                 if (BuildConfig.HAS_NOTIFICATION_ACCESS) {
-                    "NOTIFICATIONS & MUSIC\\nOptional notification access lets Phantom show notification previews and control the active media session. Notification content is processed locally for the lockscreen."
+                    "NOTIFICATIONS & MUSIC\nOptional notification access lets Phantom show notification previews and control the active media session. Notification content is processed locally for the lockscreen."
                 } else {
-                    "NOTIFICATIONS & MUSIC\\nNot included in this direct-download edition. The full notification and media-session integration is kept in the Play-distribution build because Android blocks unverified internet-sideloaded apps that request notification-listener access."
+                    "NOTIFICATIONS & MUSIC\nNot included in this direct-download edition. The full notification and media-session integration is kept in the Play-distribution build because Android blocks unverified internet-sideloaded apps that request notification-listener access."
                 },
             12f,
             0xFF8793AD.toInt(),
