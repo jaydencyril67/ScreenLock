@@ -857,10 +857,16 @@ class PhantomLockActivity : Activity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_CAMERA_PERMISSION &&
-            grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
-        ) {
-            toggleFlashlight()
+        if (requestCode == REQUEST_CAMERA_PERMISSION) {
+            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+                toggleFlashlight()
+            } else {
+                android.widget.Toast.makeText(
+                    this,
+                    "Camera permission is needed to control the flashlight.",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
         }
     }
 
