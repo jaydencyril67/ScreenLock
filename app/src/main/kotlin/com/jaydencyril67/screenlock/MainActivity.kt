@@ -20,11 +20,17 @@ import android.widget.Toast
 
 class MainActivity : Activity() {
 
+    companion object {
+        private const val REQUEST_WALLPAPER = 4170
+    }
+
     private lateinit var statusTitle: TextView
     private lateinit var statusDetails: TextView
     private lateinit var overlayButton: Button
     private lateinit var notificationAccessButton: Button
     private lateinit var protectionButton: Button
+    private lateinit var wallpaperStatus: TextView
+    private lateinit var resetWallpaperButton: Button
 
     private val prefs by lazy {
         getSharedPreferences(PhantomOverlayService.PREFS, MODE_PRIVATE)
@@ -112,6 +118,39 @@ class MainActivity : Activity() {
             buttonParams().apply { topMargin = dp(12) }
         )
 
+        val wallpaperSection = label(
+            "LOCKSCREEN WALLPAPER",
+            10f,
+            0xFF8296BC.toInt(),
+            true
+        ).apply {
+            letterSpacing = 0.18f
+            setPadding(0, dp(28), 0, dp(10))
+        }
+        root.addView(wallpaperSection)
+
+        wallpaperStatus = label("", 12f, 0xFFAAB6CE.toInt(), false).apply {
+            setPadding(0, 0, 0, dp(12))
+        }
+        root.addView(wallpaperStatus)
+
+        val chooseWallpaperButton = actionButton(
+            "CHOOSE WALLPAPER FROM DEVICE",
+            0xFF27354A.toInt()
+        )
+        chooseWallpaperButton.setOnClickListener { openWallpaperPicker() }
+        root.addView(chooseWallpaperButton, buttonParams())
+
+        resetWallpaperButton = actionButton(
+            "RESTORE DEFAULT WALLPAPER",
+            0xFF34313A.toInt()
+        )
+        resetWallpaperButton.setOnClickListener { restoreDefaultWallpaper() }
+        root.addView(
+            resetWallpaperButton,
+            buttonParams().apply { topMargin = dp(10) }
+        )
+
         protectionButton = actionButton("ACTIVATE PHANTOM LOCK", 0xFF526ED6.toInt())
         protectionButton.setOnClickListener { toggleProtection() }
         val protectParams = buttonParams().apply { topMargin = dp(18) }
@@ -149,6 +188,7 @@ class MainActivity : Activity() {
     }
 
     private fun refreshDashboard() {
+        refreshWallpaperStatus()
         notificationAccessButton.visibility =
             if (BuildConfig.HAS_NOTIFICATION_ACCESS) View.VISIBLE else View.GONE
 
@@ -194,6 +234,79 @@ class MainActivity : Activity() {
             if (enabled) 0xFF563044.toInt() else 0xFF526ED6.toInt(),
             18f
         )
+    }
+
+    private fun refreshWallpaperStatus() {
+        if (!::wallpaperStatus.isInitialized) return
+        val selected = prefs.getString(PhantomWallpaperStore.PREF_KEY, null)
+        wallpaperStatus.text = if (selected.isNullOrBlank()) {
+            "Using Phantom's built-in dark wallpaper. Choose any photo stored on your phone to make it your lockscreen background."
+        } else {
+            "Your custom lockscreen wallpaper is saved. It will remain selected after you close or restart Phantom."
+        }
+        if (::resetWallpaperButton.isInitialized) {
+            resetWallpaperButton.visibility =
+                if (selected.isNullOrBlank()) View.GONE else View.VISIBLE
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun openWallpaperPicker() {
+        val picker = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "image/*"
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+            )
+        }
+
+        try {
+            startActivityForResult(picker, REQUEST_WALLPAPER)
+        } catch (_: Exception) {
+            Toast.makeText(
+                this,
+                "No compatible image picker is available on this device.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    private fun restoreDefaultWallpaper() {
+        prefs.edit().remove(PhantomWallpaperStore.PREF_KEY).apply()
+        refreshWallpaperStatus()
+        Toast.makeText(this, "Default Phantom wallpaper restored.", Toast.LENGTH_SHORT).show()
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_WALLPAPER || resultCode != RESULT_OK) return
+
+        val selectedUri = data?.data ?: return
+        val readPermission = (data.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        if (readPermission != 0) {
+            try {
+                contentResolver.takePersistableUriPermission(selectedUri, readPermission)
+            } catch (_: SecurityException) {
+                Toast.makeText(
+                    this,
+                    "Android could not keep access to that image. Please choose it again.",
+                    Toast.LENGTH_LONG
+                ).show()
+                return
+            }
+        }
+
+        prefs.edit()
+            .putString(PhantomWallpaperStore.PREF_KEY, selectedUri.toString())
+            .apply()
+        refreshWallpaperStatus()
+        Toast.makeText(
+            this,
+            "Lockscreen wallpaper saved.",
+            Toast.LENGTH_SHORT
+        ).show()
     }
 
     private fun requestOverlayPermission() {
