@@ -459,15 +459,61 @@ class PhantomLockActivity : Activity() {
             clipChildren = false
             clipToPadding = false
         }
+        var fingerprintTouchStartedArmed = false
+        var fingerprintHoldTriggered = false
+        var fingerprintTouchActive = false
+        var fingerprintHoldRunnable: Runnable? = null
+
         val fingerprint = ImageView(this).apply {
             setImageResource(R.drawable.ic_s20_fingerprint)
             scaleType = ImageView.ScaleType.FIT_CENTER
             imageTintList = ColorStateList.valueOf(0xFFF5F2ED.toInt())
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
-            contentDescription = "Fingerprint"
+            contentDescription = "Fingerprint — press and hold after arming"
             isClickable = true
             isFocusable = true
-            setOnClickListener { onFingerprintPressed() }
+            setOnTouchListener { view, event ->
+                when (event.actionMasked) {
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        fingerprintTouchActive = true
+                        fingerprintTouchStartedArmed = armed
+                        fingerprintHoldTriggered = false
+                        if (fingerprintTouchStartedArmed && !authenticating && !unlockPending) {
+                            val hold = Runnable {
+                                if (fingerprintTouchActive && fingerprintTouchStartedArmed &&
+                                    armed && !authenticating && !unlockPending
+                                ) {
+                                    fingerprintHoldTriggered = true
+                                    onFingerprintPressed()
+                                }
+                            }
+                            fingerprintHoldRunnable = hold
+                            handler.postDelayed(hold, 350L)
+                        }
+                        true
+                    }
+                    android.view.MotionEvent.ACTION_UP -> {
+                        fingerprintTouchActive = false
+                        fingerprintHoldRunnable?.let(handler::removeCallbacks)
+                        fingerprintHoldRunnable = null
+                        // An unarmed tap keeps the existing mismatch feedback.
+                        // Once armed, a short tap does nothing; a 350ms hold unlocks.
+                        if (!fingerprintTouchStartedArmed) {
+                            onFingerprintPressed()
+                        }
+                        view.isPressed = false
+                        true
+                    }
+                    android.view.MotionEvent.ACTION_CANCEL -> {
+                        fingerprintTouchActive = false
+                        fingerprintHoldRunnable?.let(handler::removeCallbacks)
+                        fingerprintHoldRunnable = null
+                        view.isPressed = false
+                        true
+                    }
+                    else -> true
+                }
+            }
         }
         fingerprintView = fingerprint
         sensorStack.addView(
@@ -685,7 +731,13 @@ class PhantomLockActivity : Activity() {
         // The padlock remains visually and audibly silent.
         armed = false
         armRunnable?.let(handler::removeCallbacks)
-        val pendingArm = Runnable { armed = true }
+        val pendingArm = Runnable {
+            armed = true
+            if (::fingerprintHint.isInitialized) {
+                fingerprintHint.text = "PRESS & HOLD TO UNLOCK"
+                fingerprintHint.setTextColor(0xFFE3DCD1.toInt())
+            }
+        }
         armRunnable = pendingArm
         handler.postDelayed(pendingArm, 180L)
     }
