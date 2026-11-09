@@ -26,8 +26,16 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Set up Android SDK
+      - name: Set up Android SDK tools
         uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: false
+          packages: ""
+
+      - name: Accept licenses and install Android 35
+        run: |
+          yes | sdkmanager --licenses
+          yes | sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
