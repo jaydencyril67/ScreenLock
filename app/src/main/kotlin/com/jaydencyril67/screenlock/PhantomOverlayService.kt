@@ -9,47 +9,60 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.os.PowerManager
 import android.provider.Settings
-import android.view.Gravity
-import android.view.WindowManager
-import android.app.KeyguardManager
 
 class PhantomOverlayService : Service() {
 
     companion object {
         const val ACTION_START = "com.jaydencyril67.screenlock.action.START"
         const val ACTION_STOP = "com.jaydencyril67.screenlock.action.STOP"
-        const val ACTION_AUTHENTICATED = "com.jaydencyril67.screenlock.action.AUTHENTICATED"
-        const val ACTION_AUTH_CANCELLED = "com.jaydencyril67.screenlock.action.AUTH_CANCELLED"
+        const val ACTION_CLOSE_LOCK = "com.jaydencyril67.screenlock.action.CLOSE_LOCK"
         const val PREFS = "phantom_lock_settings"
         const val PREF_ENABLED = "protection_enabled"
+
         private const val CHANNEL_ID = "phantom_lock_service"
         private const val NOTIFICATION_ID = 7314
     }
 
     private val handler = Handler(Looper.getMainLooper())
-    private lateinit var windowManager: WindowManager
-    private var lockView: PhantomOverlayView? = null
     private var screenReceiverRegistered = false
-    private var authInProgress = false
+
+    private val showLockRunnable = Runnable {
+        if (!isProtectionEnabled() || !Settings.canDrawOverlays(this)) return@Runnable
+
+        try {
+            val intent = Intent(this, PhantomLockActivity::class.java).apply {
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_NO_ANIMATION
+                )
+            }
+            startActivity(intent)
+        } catch (_: Exception) {
+            // Keep the service alive; the next screen wake can retry.
+        }
+    }
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_SCREEN_OFF -> {
-                    authInProgress = false
-                    removeLockOverlay()
+                    handler.removeCallbacks(showLockRunnable)
+                    sendBroadcast(Intent(ACTION_CLOSE_LOCK).setPackage(packageName))
                 }
-                Intent.ACTION_USER_PRESENT -> {
-                    handler.postDelayed({
-                        if (isProtectionEnabled()) showLockOverlay()
-                    }, 350L)
+
+                Intent.ACTION_SCREEN_ON -> {
+                    handler.removeCallbacks(showLockRunnable)
+                    if (isProtectionEnabled()) {
+                        // Let Android finish waking the display before placing our screen.
+                        handler.postDelayed(showLockRunnable, 280L)
+                    }
                 }
             }
         }
@@ -57,7 +70,6 @@ class PhantomOverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         createNotificationChannel()
         registerScreenReceiver()
     }
@@ -68,18 +80,7 @@ class PhantomOverlayService : Service() {
                 disableProtection()
                 return START_NOT_STICKY
             }
-            ACTION_AUTHENTICATED -> {
-                authInProgress = false
-                removeLockOverlay()
-                if (isProtectionEnabled()) startForeground(NOTIFICATION_ID, buildNotification())
-                return START_STICKY
-            }
-            ACTION_AUTH_CANCELLED -> {
-                authInProgress = false
-                lockView?.showReady()
-                if (isProtectionEnabled()) startForeground(NOTIFICATION_ID, buildNotification())
-                return START_STICKY
-            }
+
             ACTION_START -> {
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                     .putBoolean(PREF_ENABLED, true)
@@ -92,6 +93,8 @@ class PhantomOverlayService : Service() {
             return START_NOT_STICKY
         }
 
+        // Overlay permission is also the user's explicit authorization for this
+        // screen-on utility to launch its lock Activity from the background.
         if (!Settings.canDrawOverlays(this)) {
             getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putBoolean(PREF_ENABLED, false)
@@ -101,26 +104,19 @@ class PhantomOverlayService : Service() {
         }
 
         startForeground(NOTIFICATION_ID, buildNotification())
-
-        val power = getSystemService(POWER_SERVICE) as PowerManager
-        val keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
-        if (power.isInteractive && !keyguard.isKeyguardLocked) {
-            showLockOverlay()
-        } else {
-            removeLockOverlay()
-        }
-
         return START_STICKY
     }
 
     private fun isProtectionEnabled(): Boolean =
-        getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_ENABLED, false)
+        getSharedPreferences(PREFS, MODE_PRIVATE)
+            .getBoolean(PREF_ENABLED, false)
 
     private fun registerScreenReceiver() {
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
-            addAction(Intent.ACTION_USER_PRESENT)
+            addAction(Intent.ACTION_SCREEN_ON)
         }
+
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(screenReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
@@ -130,62 +126,6 @@ class PhantomOverlayService : Service() {
         screenReceiverRegistered = true
     }
 
-    private fun showLockOverlay() {
-        if (!isProtectionEnabled() || authInProgress || lockView != null) return
-        if (!Settings.canDrawOverlays(this)) return
-
-        val keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
-        val power = getSystemService(POWER_SERVICE) as PowerManager
-        if (!power.isInteractive || keyguard.isKeyguardLocked) return
-
-        val view = PhantomOverlayView(this) { requestSystemAuthentication() }
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
-        }
-
-        try {
-            windowManager.addView(view, params)
-            lockView = view
-        } catch (_: Exception) {
-            lockView = null
-        }
-    }
-
-    private fun removeLockOverlay() {
-        val view = lockView ?: return
-        try {
-            windowManager.removeView(view)
-        } catch (_: Exception) {
-            // The system may already have removed the overlay during shutdown.
-        }
-        lockView = null
-    }
-
-    private fun requestSystemAuthentication() {
-        if (authInProgress) return
-        authInProgress = true
-        lockView?.showVerifying()
-
-        try {
-            val intent = Intent(this, CredentialAuthActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
-            }
-            startActivity(intent)
-        } catch (_: Exception) {
-            authInProgress = false
-            lockView?.showReady()
-        }
-    }
-
     private fun buildNotification(): Notification {
         val openApp = PendingIntent.getActivity(
             this,
@@ -193,6 +133,7 @@ class PhantomOverlayService : Service() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+
         val stopService = PendingIntent.getService(
             this,
             2,
@@ -203,12 +144,16 @@ class PhantomOverlayService : Service() {
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentTitle("Phantom Lock is active")
-            .setContentText("Your Android lock screen is backed by a second lock layer.")
+            .setContentText("Your fingerprint lock screen appears whenever the display wakes.")
             .setContentIntent(openApp)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(Notification.CATEGORY_SERVICE)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Turn off", stopService)
+            .addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                "Turn off",
+                stopService
+            )
             .build()
     }
 
@@ -219,7 +164,7 @@ class PhantomOverlayService : Service() {
                 "Phantom Lock protection",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Keeps Phantom Lock ready to protect the phone after screen unlock."
+                description = "Keeps Phantom Lock ready for each screen wake."
                 setShowBadge(false)
             }
             (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
@@ -231,15 +176,15 @@ class PhantomOverlayService : Service() {
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
             .putBoolean(PREF_ENABLED, false)
             .apply()
-        authInProgress = false
-        removeLockOverlay()
+
+        handler.removeCallbacksAndMessages(null)
+        sendBroadcast(Intent(ACTION_CLOSE_LOCK).setPackage(packageName))
         stopForeground(true)
         stopSelf()
     }
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
-        removeLockOverlay()
         if (screenReceiverRegistered) {
             try {
                 unregisterReceiver(screenReceiver)
