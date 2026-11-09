@@ -6,7 +6,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: phantom-lock-debug-apk
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -37,12 +41,29 @@ jobs:
           yes | sdkmanager --licenses
           yes | sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Build debug APK
+      - name: Build debug APKs
         run: gradle --no-daemon :app:assembleSideloadDebug :app:assemblePlayDebug
 
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: screenlock-debug-apk
-          path: app/build/outputs/apk/sideload/debug/app-sideload-debug.apk
-          if-no-files-found: error
+      - name: Prepare direct APK download
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/sideload/debug/app-sideload-debug.apk"
+          test -s "$APK"
+          cp "$APK" PhantomLock-debug.apk
+          ls -lh PhantomLock-debug.apk
+
+      - name: Publish direct debug APK download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view debug-latest >/dev/null 2>&1; then
+            gh release upload debug-latest PhantomLock-debug.apk --clobber
+            gh release edit debug-latest --title "Phantom Lock Debug (latest)" --notes "Automatically updated debug sideload APK from the latest successful main-branch build. This is a debug build, not the production release."
+          else
+            gh release create debug-latest PhantomLock-debug.apk \
+              --target "$GITHUB_SHA" \
+              --title "Phantom Lock Debug (latest)" \
+              --notes "Automatically updated debug sideload APK from the latest successful main-branch build. This is a debug build, not the production release." \
+              --prerelease
+          fi
