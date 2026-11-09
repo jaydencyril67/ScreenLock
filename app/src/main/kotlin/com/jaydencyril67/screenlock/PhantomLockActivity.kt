@@ -667,13 +667,29 @@ class PhantomLockActivity : Activity() {
                 ?.takeIf { it.isNotBlank() }
 
         if (controller == null || title == null) {
-            mediaContainer.visibility = View.GONE
+            mediaContainer.visibility = View.VISIBLE
+            mediaTitle.text = if (BuildConfig.HAS_NOTIFICATION_ACCESS) {
+                "Nothing playing"
+            } else {
+                "Music controls unavailable"
+            }
+            mediaSubtitle.text = if (BuildConfig.HAS_NOTIFICATION_ACCESS) {
+                "Start music on your phone"
+            } else {
+                "Android media access is not included in this edition"
+            }
+            mediaArtwork.setImageResource(R.drawable.ic_music_note)
+            mediaPlayPause.text = "▶"
+            mediaPlayPause.isEnabled = false
+            mediaPlayPause.alpha = 0.45f
             return
         }
 
         mediaContainer.visibility = View.VISIBLE
         mediaTitle.text = title
         mediaSubtitle.text = artist.orEmpty()
+        mediaPlayPause.isEnabled = true
+        mediaPlayPause.alpha = 1f
         val artwork = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
             ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
         if (artwork != null) {
