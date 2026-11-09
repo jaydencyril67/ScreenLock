@@ -26,7 +26,6 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -218,6 +217,10 @@ class PhantomLockActivity : Activity() {
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             gravity = Gravity.CENTER
             includeFontPadding = false
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Battery status"
+            setOnClickListener { armFingerprint() }
         }
         root.addView(
             batteryLabel,
@@ -226,23 +229,6 @@ class PhantomLockActivity : Activity() {
                 dp(28),
                 Gravity.TOP or Gravity.END
             ).apply {
-                topMargin = dp(29)
-                marginEnd = dp(67)
-            }
-        )
-
-        val padlock = ImageButton(this).apply {
-            setImageResource(R.drawable.ic_phantom_padlock)
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            imageTintList = ColorStateList.valueOf(0xFFECEAE6.toInt())
-            setBackgroundColor(Color.TRANSPARENT)
-            contentDescription = "Arm fingerprint unlock"
-            setPadding(0, 0, 0, 0)
-            setOnClickListener { armFingerprint() }
-        }
-        root.addView(
-            padlock,
-            FrameLayout.LayoutParams(dp(25), dp(25), Gravity.TOP or Gravity.END).apply {
                 topMargin = dp(29)
                 marginEnd = dp(25)
             }
@@ -485,7 +471,6 @@ class PhantomLockActivity : Activity() {
             clipToPadding = false
         }
         var fingerprintTouchStartedArmed = false
-        var fingerprintHoldTriggered = false
         var fingerprintTouchActive = false
         var fingerprintHoldRunnable: Runnable? = null
 
@@ -502,13 +487,17 @@ class PhantomLockActivity : Activity() {
                     android.view.MotionEvent.ACTION_DOWN -> {
                         fingerprintTouchActive = true
                         fingerprintTouchStartedArmed = armed
-                        fingerprintHoldTriggered = false
-                        if (fingerprintTouchStartedArmed && !authenticating && !unlockPending) {
+
+                        if (!fingerprintTouchStartedArmed) {
+                            // Show the mismatch as soon as the finger touches down.
+                            // ACTION_UP deliberately does not trigger a second response.
+                            onFingerprintPressed()
+                        } else if (!authenticating && !unlockPending) {
+                            // Unlock while the finger is still held. No release is needed.
                             val hold = Runnable {
                                 if (fingerprintTouchActive && fingerprintTouchStartedArmed &&
                                     armed && !authenticating && !unlockPending
                                 ) {
-                                    fingerprintHoldTriggered = true
                                     onFingerprintPressed()
                                 }
                             }
@@ -521,11 +510,6 @@ class PhantomLockActivity : Activity() {
                         fingerprintTouchActive = false
                         fingerprintHoldRunnable?.let(handler::removeCallbacks)
                         fingerprintHoldRunnable = null
-                        // An unarmed tap keeps the existing mismatch feedback.
-                        // Once armed, a short tap does nothing; a 350ms hold unlocks.
-                        if (!fingerprintTouchStartedArmed) {
-                            onFingerprintPressed()
-                        }
                         view.isPressed = false
                         true
                     }
@@ -898,7 +882,7 @@ class PhantomLockActivity : Activity() {
     }
 
     private fun armFingerprint() {
-        // The padlock remains visually and audibly silent.
+        // Battery percentage is the discreet arming target; no lock icon is shown.
         armed = false
         armRunnable?.let(handler::removeCallbacks)
         val pendingArm = Runnable {
