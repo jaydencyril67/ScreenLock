@@ -43,7 +43,6 @@ class PhantomLockActivity : Activity() {
 
     companion object {
         private const val REQUEST_CAMERA_PERMISSION = 4171
-        private const val REQUEST_LOCAL_MUSIC = 4172
         private const val CAMERA_ACTION_NONE = 0
         private const val CAMERA_ACTION_FLASH = 1
         private const val CAMERA_ACTION_OPEN_CAMERA = 2
@@ -127,7 +126,7 @@ class PhantomLockActivity : Activity() {
                     }
                 }
 
-                LocalMusicPlaybackService.ACTION_STATE_CHANGED -> refreshDynamicContent()
+                PhantomMediaListenerService.ACTION_STATE_CHANGED -> refreshDynamicContent()
 
                 PhantomOverlayService.ACTION_CLOSE_LOCK -> {
                     armed = false
@@ -582,13 +581,13 @@ class PhantomLockActivity : Activity() {
             setPadding(0, dp(8), 0, 0)
         }
         mediaPrevious = mediaControl("previous", "Previous track") {
-            sendMusicCommand(LocalMusicPlaybackService.ACTION_PREVIOUS)
+            sendMusicCommand(PhantomMediaListenerService.COMMAND_PREVIOUS)
         }
         mediaPlayPause = mediaControl("play", "Play or pause") {
-            sendMusicCommand(LocalMusicPlaybackService.ACTION_TOGGLE)
+            sendMusicCommand(PhantomMediaListenerService.COMMAND_PLAY_PAUSE)
         }
         mediaNext = mediaControl("next", "Next track") {
-            sendMusicCommand(LocalMusicPlaybackService.ACTION_NEXT)
+            sendMusicCommand(PhantomMediaListenerService.COMMAND_NEXT)
         }
         mediaControls.addView(mediaPrevious, LinearLayout.LayoutParams(dp(42), dp(42)))
         mediaControls.addView(mediaPlayPause, LinearLayout.LayoutParams(dp(48), dp(48)).apply {
@@ -606,7 +605,7 @@ class PhantomLockActivity : Activity() {
         )
 
         mediaChoose = TextView(this).apply {
-            text = "CHANGE MUSIC"
+            text = "MEDIA ACCESS"
             textSize = 9f
             letterSpacing = 0.08f
             setTextColor(0xFFE4C49A.toInt())
@@ -621,8 +620,8 @@ class PhantomLockActivity : Activity() {
             }
             isClickable = true
             isFocusable = true
-            contentDescription = "Choose local music files"
-            setOnClickListener { openLocalMusicPicker() }
+            contentDescription = "Enable access to local music controls"
+            setOnClickListener { openMediaAccessSettings() }
         }
         mediaContainer.addView(
             mediaChoose,
@@ -812,151 +811,83 @@ class PhantomLockActivity : Activity() {
 
     private fun updateMediaContent() {
         if (!::mediaContainer.isInitialized) return
-        val prefs = getSharedPreferences(LocalMusicPlaybackService.PREFS, MODE_PRIVATE)
-        val queue = prefs.getString(LocalMusicPlaybackService.KEY_QUEUE, "")
-            .orEmpty()
-            .lineSequence()
-            .filter { it.isNotBlank() }
-            .toList()
-        val index = prefs.getInt(LocalMusicPlaybackService.KEY_INDEX, 0)
-            .coerceIn(0, (queue.size - 1).coerceAtLeast(0))
-        val playing = prefs.getBoolean(LocalMusicPlaybackService.KEY_PLAYING, false)
+        val metadata = PhantomMediaListenerService.currentMetadata
+        val controller = PhantomMediaListenerService.activeController
+        val hasLocalTrack = metadata != null && controller != null
 
         mediaContainer.visibility = View.VISIBLE
-        if (queue.isEmpty()) {
-            mediaTitle.text = "Your local music"
-            mediaSubtitle.text = "Choose audio stored on this phone"
-            mediaArtwork.setImageResource(R.drawable.ic_music_note)
-            mediaChoose.text = "CHOOSE MUSIC FROM PHONE"
-        } else {
-            mediaTitle.text = prefs.getString(
-                LocalMusicPlaybackService.KEY_TITLE,
-                "Loading selected track…"
-            )
-            mediaSubtitle.text = prefs.getString(
-                LocalMusicPlaybackService.KEY_ARTIST,
-                "LOCAL AUDIO"
-            )
-            mediaChoose.text = "CHANGE LOCAL MUSIC"
-            val bitmap = try {
-                val retriever = android.media.MediaMetadataRetriever()
-                try {
-                    retriever.setDataSource(this, Uri.parse(queue[index]))
-                    val bytes = retriever.embeddedPicture
-                    if (bytes != null) {
-                        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                    } else null
-                } finally {
-                    retriever.release()
-                }
-            } catch (_: Exception) {
-                null
-            }
-            if (bitmap != null) {
-                mediaArtwork.setImageBitmap(bitmap)
+        if (!hasLocalTrack) {
+            mediaTitle.text = "No local music playing"
+            mediaSubtitle.text = if (PhantomMediaListenerService.hasNotificationAccess(this)) {
+                "Play a song stored on this phone"
             } else {
-                mediaArtwork.setImageResource(R.drawable.ic_music_note)
+                "Allow access to control local music"
             }
+            mediaArtwork.setImageResource(R.drawable.ic_music_note)
+            mediaChoose.text = if (PhantomMediaListenerService.hasNotificationAccess(this)) {
+                "WAITING FOR LOCAL MUSIC"
+            } else {
+                "ENABLE MEDIA ACCESS"
+            }
+        } else {
+            mediaTitle.text = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE)
+                ?.takeIf { it.isNotBlank() } ?: "Unknown track"
+            val artist = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST)
+                ?: metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ARTIST)
+                ?: "LOCAL AUDIO"
+            mediaSubtitle.text = artist
+            mediaChoose.text = "LOCAL MUSIC"
+            val artwork = metadata?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART)
+                ?: metadata?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ART)
+            if (artwork != null) mediaArtwork.setImageBitmap(artwork)
+            else mediaArtwork.setImageResource(R.drawable.ic_music_note)
         }
 
-        val hasMusic = queue.isNotEmpty()
-        mediaPrevious.isEnabled = hasMusic
-        mediaPrevious.alpha = if (hasMusic) 1f else 0.35f
-        mediaPlayPause.isEnabled = hasMusic
-        mediaPlayPause.alpha = if (hasMusic) 1f else 0.35f
-        mediaNext.isEnabled = hasMusic
-        mediaNext.alpha = if (hasMusic) 1f else 0.35f
+        val playing = PhantomMediaListenerService.isPlaying
+        mediaPrevious.isEnabled = hasLocalTrack
+        mediaPrevious.alpha = if (hasLocalTrack) 1f else 0.35f
+        mediaPlayPause.isEnabled = hasLocalTrack
+        mediaPlayPause.alpha = if (hasLocalTrack) 1f else 0.35f
+        mediaNext.isEnabled = hasLocalTrack
+        mediaNext.alpha = if (hasLocalTrack) 1f else 0.35f
         mediaPlayPause.setImageDrawable(
-            MediaControlDrawable(
-                if (playing) "pause" else "play",
-                0xFF10131A.toInt()
-            )
+            MediaControlDrawable(if (playing) "pause" else "play", 0xFF10131A.toInt())
         )
     }
 
-    private fun sendMusicCommand(action: String) {
+    private fun sendMusicCommand(command: String) {
+        if (PhantomMediaListenerService.sendCommand(command)) return
+        updateMediaContent()
+        android.widget.Toast.makeText(
+            this,
+            "No local music session is active.",
+            android.widget.Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    private fun openMediaAccessSettings() {
+        if (PhantomMediaListenerService.hasNotificationAccess(this)) {
+            updateMediaContent()
+            return
+        }
+        externalShortcutLaunched = true
         try {
-            startService(
-                Intent(this, LocalMusicPlaybackService::class.java).setAction(action)
-            )
+            startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         } catch (_: Exception) {
+            externalShortcutLaunched = false
             android.widget.Toast.makeText(
                 this,
-                "Could not control local music.",
+                "Could not open Notification Access settings.",
                 android.widget.Toast.LENGTH_SHORT
             ).show()
         }
     }
 
-    @Suppress("DEPRECATION")
-    private fun openLocalMusicPicker() {
-        val picker = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = "audio/*"
-            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-            addFlags(
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
-            )
-        }
-        externalShortcutLaunched = true
-        try {
-            startActivityForResult(picker, REQUEST_LOCAL_MUSIC)
-        } catch (_: Exception) {
-            externalShortcutLaunched = false
-            android.widget.Toast.makeText(
-                this,
-                "No audio file picker is available on this device.",
-                android.widget.Toast.LENGTH_LONG
-            ).show()
-        }
-    }
-
-    @Suppress("DEPRECATION")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != REQUEST_LOCAL_MUSIC) return
-        externalShortcutLaunched = false
-        if (resultCode != RESULT_OK || data == null) return
-
-        val selected = mutableListOf<Uri>()
-        val clip = data.clipData
-        if (clip != null) {
-            for (index in 0 until clip.itemCount) {
-                clip.getItemAt(index).uri?.let(selected::add)
-            }
-        } else {
-            data.data?.let(selected::add)
-        }
-
-        val uris = selected.distinct()
-        if (uris.isEmpty()) return
-
-        uris.forEach { uri ->
-            try {
-                contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            } catch (_: SecurityException) {
-                // Some document providers grant temporary access only.
-            }
-        }
-
-        val uriStrings = ArrayList(uris.map { it.toString() })
-        val playerIntent = Intent(this, LocalMusicPlaybackService::class.java).apply {
-            action = LocalMusicPlaybackService.ACTION_SET_QUEUE
-            putStringArrayListExtra(LocalMusicPlaybackService.EXTRA_QUEUE, uriStrings)
-        }
-        try {
-            startService(playerIntent)
-            handler.postDelayed({ updateMediaContent() }, 250L)
-        } catch (_: Exception) {
-            android.widget.Toast.makeText(
-                this,
-                "Could not start the local music player.",
-                android.widget.Toast.LENGTH_LONG
-            ).show()
+    override fun onResume() {
+        super.onResume()
+        if (::mediaContainer.isInitialized) {
+            PhantomMediaListenerService.refreshSessions(this)
+            updateMediaContent()
         }
     }
 
@@ -1288,7 +1219,7 @@ class PhantomLockActivity : Activity() {
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(PhantomOverlayService.ACTION_CLOSE_LOCK)
-            addAction(LocalMusicPlaybackService.ACTION_STATE_CHANGED)
+            addAction(PhantomMediaListenerService.ACTION_STATE_CHANGED)
         }
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(screenOffReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
