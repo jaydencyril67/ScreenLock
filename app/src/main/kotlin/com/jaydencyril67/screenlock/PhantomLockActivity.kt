@@ -1448,26 +1448,22 @@ private class PhantomEdgeLightingView(context: Context) : View(context) {
     private val measure = PathMeasure()
     private val bounds = RectF()
     private val shaderMatrix = Matrix()
-    private val rainbow = SweepGradient(
-        0f, 0f,
-        intArrayOf(
-            Color.RED,
-            0xFFFF8A00.toInt(),
-            Color.YELLOW,
-            Color.GREEN,
-            Color.CYAN,
-            Color.BLUE,
-            0xFFB000FF.toInt(),
-            Color.RED
-        ),
-        null
+    private val rainbowColors = intArrayOf(
+        Color.RED,
+        0xFFFF8A00.toInt(),
+        Color.YELLOW,
+        Color.GREEN,
+        Color.CYAN,
+        Color.BLUE,
+        0xFFB000FF.toInt(),
+        Color.RED
     )
+    private var rainbow: SweepGradient? = null
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
         strokeWidth = 13f * density
-        shader = rainbow
         setShadowLayer(18f * density, 0f, 0f, Color.WHITE)
     }
     private val lightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1475,7 +1471,6 @@ private class PhantomEdgeLightingView(context: Context) : View(context) {
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
         strokeWidth = 3.2f * density
-        shader = rainbow
     }
     private var progress = 0f
     private var animator: ValueAnimator? = null
@@ -1485,6 +1480,15 @@ private class PhantomEdgeLightingView(context: Context) : View(context) {
         isClickable = false
         isFocusable = false
         contentDescription = "Animated multicolour edge lighting"
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (w <= 0 || h <= 0) return
+        val shader = SweepGradient(w / 2f, h / 2f, rainbowColors, null)
+        rainbow = shader
+        glowPaint.shader = shader
+        lightPaint.shader = shader
     }
 
     override fun onAttachedToWindow() {
@@ -1532,7 +1536,7 @@ private class PhantomEdgeLightingView(context: Context) : View(context) {
         }
 
         shaderMatrix.setRotate(progress * 360f, width / 2f, height / 2f)
-        rainbow.setLocalMatrix(shaderMatrix)
+        rainbow?.setLocalMatrix(shaderMatrix)
         canvas.drawPath(segment, glowPaint)
         canvas.drawPath(segment, lightPaint)
     }
