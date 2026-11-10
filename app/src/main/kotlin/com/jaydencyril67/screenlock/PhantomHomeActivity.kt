@@ -29,10 +29,13 @@ import android.widget.Toast
 import android.widget.ViewFlipper
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import androidx.appcompat.widget.SearchView
 import dev.oneuiproject.oneui.dialog.GridMenuDialog
 import dev.oneuiproject.oneui.widget.RoundedFrameLayout
 import dev.oneuiproject.oneui.widget.RoundedLinearLayout
+import dev.oneuiproject.oneui.widget.RoundedRecyclerView
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.Collator
@@ -85,7 +88,8 @@ class PhantomHomeActivity : AppCompatActivity() {
     private lateinit var dateLabel: TextView
     private lateinit var homeGestureDetector: GestureDetector
     private lateinit var widgetContainer: LinearLayout
-    private lateinit var homeAppsContainer: LinearLayout
+    private lateinit var homeAppsContainer: RoundedRecyclerView
+    private lateinit var homeAppsAdapter: LauncherTilesAdapter
     private lateinit var widgetHost: PhantomWidgetHost
 
     private var launchableApps: List<LauncherApp> = emptyList()
@@ -309,8 +313,13 @@ class PhantomHomeActivity : AppCompatActivity() {
         )
         widgetHost = PhantomWidgetHost(this, widgetContainer)
 
-        homeAppsContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        homeAppsContainer = RoundedRecyclerView(this).apply {
+            layoutManager = GridLayoutManager(this@PhantomHomeActivity, 4)
+            isNestedScrollingEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+            itemAnimator = null
+            roundedCorners = SeslRoundedCorner.ROUNDED_CORNER_NONE
+            roundedCornersColor = 0xFF07090F.toInt()
         }
         content.addView(
             homeAppsContainer,
@@ -405,10 +414,20 @@ class PhantomHomeActivity : AppCompatActivity() {
 
     private fun renderHomeGrid() {
         if (!::homeAppsContainer.isInitialized) return
-        homeAppsContainer.removeAllViews()
         val pinnedApps = selectPinnedApps()
         val homeApps = selectHomeApps(pinnedApps).take(12)
-        addHomeRows(homeAppsContainer, buildHomeItems(homeApps), 4)
+        val items = buildHomeItems(homeApps)
+        if (::homeAppsAdapter.isInitialized) {
+            homeAppsAdapter.submitItems(items)
+        } else {
+            homeAppsAdapter = LauncherTilesAdapter(
+                items = items,
+                iconSize = 53,
+                tileHeight = 91,
+                allowFolderCreation = true
+            )
+            homeAppsContainer.adapter = homeAppsAdapter
+        }
     }
 
     private fun buildHomeItems(apps: List<LauncherApp>): List<HomeItem> {
@@ -433,41 +452,6 @@ class PhantomHomeActivity : AppCompatActivity() {
                 emittedFolderIds.add(entry.first.id) -> HomeItem.Folder(entry.first, entry.second)
                 else -> null
             }
-        }
-    }
-
-    private fun addHomeRows(
-        parent: LinearLayout,
-        items: List<HomeItem>,
-        columns: Int
-    ) {
-        items.chunked(columns).forEach { rowItems ->
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER
-            }
-            rowItems.forEach { item ->
-                val tile = when (item) {
-                    is HomeItem.App -> createAppTile(
-                        item.app,
-                        showLabel = true,
-                        iconSize = 53,
-                        allowFolderCreation = true
-                    )
-                    is HomeItem.Folder -> createFolderTile(item.folder, item.apps)
-                }
-                row.addView(tile, LinearLayout.LayoutParams(0, dp(91), 1f))
-            }
-            repeat((columns - rowItems.size).coerceAtLeast(0)) {
-                row.addView(View(this), LinearLayout.LayoutParams(0, dp(91), 1f))
-            }
-            parent.addView(
-                row,
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    dp(91)
-                )
-            )
         }
     }
 
@@ -1114,43 +1098,77 @@ class PhantomHomeActivity : AppCompatActivity() {
     }
 
     private fun createDrawerPage(apps: List<LauncherApp>): View {
-        val page = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
+        return RoundedRecyclerView(this).apply {
+            layoutManager = GridLayoutManager(this@PhantomHomeActivity, 4)
+            isNestedScrollingEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+            itemAnimator = null
             setPadding(0, dp(2), 0, dp(2))
+            roundedCorners = SeslRoundedCorner.ROUNDED_CORNER_NONE
+            roundedCornersColor = 0xFF07090F.toInt()
+            adapter = LauncherTilesAdapter(
+                items = apps.map { HomeItem.App(it) },
+                iconSize = 51,
+                tileHeight = 91,
+                allowFolderCreation = false
+            )
+        }
+    }
+
+    /**
+     * Uses the library's SESL-rounded RecyclerView for launcher grids.
+     * App/folder tiles retain their launcher-specific interactions while
+     * row measurement, item recycling and grid layout use AndroidX/SESL.
+     */
+    private inner class LauncherTilesAdapter(
+        initialItems: List<HomeItem>,
+        private val iconSize: Int,
+        private val tileHeight: Int,
+        private val allowFolderCreation: Boolean
+    ) : RecyclerView.Adapter<LauncherTileViewHolder>() {
+
+        private var items: List<HomeItem> = initialItems
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): LauncherTileViewHolder {
+            val cell = FrameLayout(this@PhantomHomeActivity).apply {
+                clipChildren = false
+                clipToPadding = false
+            }
+            return LauncherTileViewHolder(cell)
         }
 
-        for (rowIndex in 0 until 5) {
-            val rowApps = apps.drop(rowIndex * 4).take(4)
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER
-            }
-
-            for (columnIndex in 0 until 4) {
-                val app = rowApps.getOrNull(columnIndex)
-                val tile = if (app != null) {
-                    createAppTile(app, showLabel = true, iconSize = 51)
-                } else {
-                    View(this)
-                }
-                row.addView(
-                    tile,
-                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+        override fun onBindViewHolder(holder: LauncherTileViewHolder, position: Int) {
+            holder.container.removeAllViews()
+            val tile = when (val item = items[position]) {
+                is HomeItem.App -> createAppTile(
+                    item.app,
+                    showLabel = true,
+                    iconSize = iconSize,
+                    allowFolderCreation = allowFolderCreation
                 )
+                is HomeItem.Folder -> createFolderTile(item.folder, item.apps)
             }
-
-            page.addView(
-                row,
-                LinearLayout.LayoutParams(
+            holder.container.addView(
+                tile,
+                FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                    0,
-                    1f
+                    dp(tileHeight),
+                    Gravity.CENTER
                 )
             )
         }
-        return page
+
+        override fun getItemCount(): Int = items.size
+
+        fun submitItems(nextItems: List<HomeItem>) {
+            items = nextItems
+            notifyDataSetChanged()
+        }
     }
+
+    private class LauncherTileViewHolder(
+        val container: FrameLayout
+    ) : RecyclerView.ViewHolder(container)
 
     private fun showDrawerPage(requestedPage: Int) {
         val flipper = drawerPageFlipper ?: return
