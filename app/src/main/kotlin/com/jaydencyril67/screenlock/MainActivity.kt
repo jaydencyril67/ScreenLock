@@ -272,10 +272,12 @@ class MainActivity : Activity() {
         if (requestCode != REQUEST_WALLPAPER || resultCode != RESULT_OK) return
 
         val selectedUri = data?.data ?: return
-        val readPermission = (data.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        if (readPermission != 0) {
+        if ((data.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0) {
             try {
-                contentResolver.takePersistableUriPermission(selectedUri, readPermission)
+                contentResolver.takePersistableUriPermission(
+                    selectedUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
             } catch (_: SecurityException) {
                 Toast.makeText(
                     this,
