@@ -14,6 +14,7 @@ import android.os.Looper
 import android.provider.Settings
 import android.text.InputType
 import android.view.Gravity
+import androidx.appcompat.util.SeslRoundedCorner
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -30,6 +31,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import dev.oneuiproject.oneui.dialog.GridMenuDialog
+import dev.oneuiproject.oneui.widget.RoundedFrameLayout
+import dev.oneuiproject.oneui.widget.RoundedLinearLayout
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.Collator
@@ -279,8 +282,10 @@ class PhantomHomeActivity : AppCompatActivity() {
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         )
 
-        val settingsButton = text("⚙", 23f, Color.WHITE, false).apply {
-            gravity = Gravity.CENTER
+        val settingsButton = ImageView(this).apply {
+            setImageResource(dev.oneuiproject.oneui.R.drawable.ic_oui_settings_outline)
+            setColorFilter(Color.WHITE)
+            scaleType = ImageView.ScaleType.CENTER
             background = circleSurface(0x38FFFFFF, 0x55FFFFFF)
             contentDescription = "Open Phantom settings"
             isClickable = true
@@ -338,11 +343,13 @@ class PhantomHomeActivity : AppCompatActivity() {
             )
         )
 
-        val dock = LinearLayout(this).apply {
+        val dock = RoundedLinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             setPadding(dp(5), dp(4), dp(5), dp(4))
-            background = glassSurface(0x32FFFFFF, 0x36FFFFFF, 27f)
+            roundedCorners = SeslRoundedCorner.ROUNDED_CORNER_ALL
+            roundedCornersColor = 0xFF07090F.toInt()
+            setBackgroundColor(0x32FFFFFF)
         }
         selectPinnedApps().take(4).forEach { app ->
             dock.addView(
@@ -364,30 +371,36 @@ class PhantomHomeActivity : AppCompatActivity() {
     }
 
     private fun createHomeSearchBar(): View {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(15), 0, dp(15), 0)
-            background = glassSurface(0xF3F4F6F8.toInt(), 0xCFFFFFFF.toInt(), 25f)
+        val surface = RoundedFrameLayout(this).apply {
+            roundedCorners = SeslRoundedCorner.ROUNDED_CORNER_ALL
+            roundedCornersColor = 0xFF07090F.toInt()
+            setBackgroundColor(0xFFF1F2F5.toInt())
             isClickable = true
             isFocusable = true
             contentDescription = "Search apps"
             setOnClickListener { openAppDrawer(focusSearch = true) }
-
-            addView(
-                text("⌕", 25f, 0xFF454954.toInt(), false).apply {
-                    gravity = Gravity.CENTER
-                },
-                LinearLayout.LayoutParams(dp(30), dp(48))
-            )
-            addView(
-                text("Search", 14f, 0xFF555A65.toInt(), false).apply {
-                    gravity = Gravity.CENTER_VERTICAL
-                    setPadding(dp(7), 0, 0, 0)
-                },
-                LinearLayout.LayoutParams(0, dp(48), 1f)
-            )
         }
+
+        val search = SearchView(this).apply {
+            setIconifiedByDefault(false)
+            isIconified = false
+            queryHint = "Search apps"
+            maxWidth = Int.MAX_VALUE
+            setSubmitButtonEnabled(false)
+            setBackgroundColor(Color.TRANSPARENT)
+            isFocusable = false
+            isFocusableInTouchMode = false
+            isClickable = false
+            descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        }
+        surface.addView(
+            search,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(49)
+            )
+        )
+        return surface
     }
 
     private fun renderHomeGrid() {
@@ -573,16 +586,13 @@ class PhantomHomeActivity : AppCompatActivity() {
             }
         }
 
-        val iconSurface = LinearLayout(this).apply {
+        val iconSurface = RoundedLinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setPadding(dp(7), dp(7), dp(7), dp(7))
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = dp(15).toFloat()
-                setColor(0xA82A3044.toInt())
-                setStroke(dp(1), 0x66FFFFFF)
-            }
+            roundedCorners = SeslRoundedCorner.ROUNDED_CORNER_ALL
+            roundedCornersColor = 0xFF07090F.toInt()
+            setBackgroundColor(0xA82A3044.toInt())
         }
         apps.take(4).chunked(2).forEach { appRow ->
             val row = LinearLayout(this).apply {
@@ -954,8 +964,10 @@ class PhantomHomeActivity : AppCompatActivity() {
         )
 
         // SESL AppCompat SearchView receives its One UI styling from PhantomOneUITheme.
-        val searchSurface = FrameLayout(this).apply {
-            background = glassSurface(0xFFF1F2F5.toInt(), 0xFFFFFFFF.toInt(), 25f)
+        val searchSurface = RoundedFrameLayout(this).apply {
+            roundedCorners = SeslRoundedCorner.ROUNDED_CORNER_ALL
+            roundedCornersColor = 0xFF07090F.toInt()
+            setBackgroundColor(0xFFF1F2F5.toInt())
             clipToOutline = true
         }
         val search = SearchView(this).apply {
