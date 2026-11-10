@@ -4,6 +4,19 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Keep AndroidX aligned with Phantom's AGP 8.11.1 / compileSdk 36 toolchain.
+// Prevent transitive dependencies from upgrading to API 37 / AGP 9-only artifacts.
+configurations.configureEach {
+    resolutionStrategy.force(
+        "androidx.core:core:1.16.0",
+        "androidx.core:core-ktx:1.16.0",
+        "androidx.lifecycle:lifecycle-runtime:2.9.2",
+        "androidx.lifecycle:lifecycle-runtime-ktx:2.9.2",
+        "androidx.lifecycle:lifecycle-runtime-compose:2.9.2",
+        "androidx.lifecycle:lifecycle-runtime-compose-android:2.9.2"
+    )
+}
+
 android {
     namespace = "com.jaydencyril67.screenlock"
     compileSdk = 36
