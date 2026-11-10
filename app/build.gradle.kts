@@ -10,6 +10,7 @@ configurations.configureEach {
     // The SESL fork bundles legacy android.support classes that duplicate AndroidX core.
     // Phantom already uses AndroidX core; keep the One UI components without that conflicting fork.
     exclude(group = "sesl.androidx.core", module = "core")
+    exclude(group = "sesl.androidx.core", module = "core-ktx")
 
     resolutionStrategy.force(
         "androidx.core:core:1.16.0",
