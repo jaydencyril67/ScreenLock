@@ -80,7 +80,7 @@ class PhantomLockActivity : Activity() {
     private var flashEnabled = false
     private var flashCameraId: String? = null
     private var pendingCameraAction = CAMERA_ACTION_NONE
-    private lateinit var flashLabel: TextView
+    private lateinit var flashIcon: ImageView
 
     private val clockTick = object : Runnable {
         override fun run() {
@@ -98,7 +98,7 @@ class PhantomLockActivity : Activity() {
 
     private val clearMismatch = Runnable {
         if (::fingerprintHint.isInitialized && !unlockPending) {
-            fingerprintHint.text = "TOUCH TO UNLOCK"
+            fingerprintHint.text = ""
             fingerprintHint.setTextColor(0xC9DCE9F8.toInt())
             fingerprintHint.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
         }
@@ -116,7 +116,7 @@ class PhantomLockActivity : Activity() {
                     armRunnable = null
                     handler.removeCallbacks(clearMismatch)
                     if (::fingerprintHint.isInitialized) {
-                        fingerprintHint.text = "TOUCH TO UNLOCK"
+                        fingerprintHint.text = ""
                         fingerprintHint.setTextColor(0xC9DCE9F8.toInt())
                         fingerprintHint.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
                     }
@@ -197,7 +197,7 @@ class PhantomLockActivity : Activity() {
         armRunnable?.let(handler::removeCallbacks)
         handler.removeCallbacks(clearMismatch)
         if (::fingerprintHint.isInitialized) {
-            fingerprintHint.text = "TOUCH TO UNLOCK"
+            fingerprintHint.text = ""
             fingerprintHint.setTextColor(0xC9DCE9F8.toInt())
         }
         fingerprintView?.animate()?.cancel()
@@ -504,7 +504,7 @@ class PhantomLockActivity : Activity() {
             scaleType = ImageView.ScaleType.FIT_CENTER
             imageTintList = ColorStateList.valueOf(0xFFF5F2ED.toInt())
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
-            contentDescription = "Fingerprint — press and hold after arming"
+            contentDescription = "Fingerprint"
             isClickable = true
             isFocusable = true
             setOnTouchListener { view, event ->
@@ -555,7 +555,7 @@ class PhantomLockActivity : Activity() {
         )
 
         fingerprintHint = TextView(this).apply {
-            text = "TOUCH TO UNLOCK"
+            text = ""
             textSize = 9f
             letterSpacing = 0.19f
             setTextColor(0xC9E3DCD1.toInt())
@@ -583,15 +583,15 @@ class PhantomLockActivity : Activity() {
         )
 
         val shortcutRow = FrameLayout(this)
-        val flashShortcut = shortcutButton(R.drawable.ic_flashlight_shortcut, "FLASHLIGHT") {
+        val flashShortcut = shortcutButton(R.drawable.ic_flashlight_shortcut, "Flashlight") {
             toggleFlashlight()
         }
-        flashLabel = flashShortcut.second
+        flashIcon = flashShortcut.second
         shortcutRow.addView(
             flashShortcut.first,
             FrameLayout.LayoutParams(dp(78), dp(64), Gravity.BOTTOM or Gravity.START)
         )
-        val cameraShortcut = shortcutButton(R.drawable.ic_camera_shortcut, "CAMERA") {
+        val cameraShortcut = shortcutButton(R.drawable.ic_camera_shortcut, "Camera") {
             launchCamera()
         }
         shortcutRow.addView(
@@ -793,36 +793,39 @@ class PhantomLockActivity : Activity() {
         iconResource: Int,
         caption: String,
         action: () -> Unit
-    ): Pair<View, TextView> {
-        val column = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
+    ): Pair<View, ImageView> {
+        val button = FrameLayout(this).apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(0x70212630)
+                setStroke(dp(1), 0x66E4D2BC)
+            }
+            foreground = android.graphics.drawable.RippleDrawable(
+                ColorStateList.valueOf(0x44FFFFFF),
+                null,
+                GradientDrawable().apply { shape = GradientDrawable.OVAL }
+            )
             isClickable = true
             isFocusable = true
+            contentDescription = caption
             setOnClickListener { action() }
         }
         val icon = ImageView(this).apply {
             setImageResource(iconResource)
-            imageTintList = ColorStateList.valueOf(0xFFF4F0E9.toInt())
-            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            imageTintList = ColorStateList.valueOf(0xFFF5F1EA.toInt())
+            scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = caption
         }
-        val label = TextView(this).apply {
-            text = caption
-            textSize = 8f
-            letterSpacing = 0.14f
-            setTextColor(0xC9D8D0C5.toInt())
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            gravity = Gravity.CENTER
-            includeFontPadding = false
+        button.addView(icon, FrameLayout.LayoutParams(dp(25), dp(25), Gravity.CENTER))
+        return Pair(button, icon)
+    }
+
+    private fun updateFlashIcon() {
+        if (::flashIcon.isInitialized) {
+            flashIcon.imageTintList = ColorStateList.valueOf(
+                if (flashEnabled) 0xFFE5C18F.toInt() else 0xFFF5F1EA.toInt()
+            )
         }
-        column.addView(icon, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, dp(39)
-        ))
-        column.addView(label, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, dp(17)
-        ))
-        return Pair(column, label)
     }
 
     private fun requestCameraPermission(action: Int) {
@@ -868,17 +871,17 @@ class PhantomLockActivity : Activity() {
 
             flashEnabled = !flashEnabled
             manager.setTorchMode(cameraId, flashEnabled)
-            flashLabel.text = if (flashEnabled) "FLASH ON" else "FLASHLIGHT"
+            updateFlashIcon()
         } catch (_: SecurityException) {
             flashEnabled = false
-            flashLabel.text = "FLASHLIGHT"
+            updateFlashIcon()
             android.widget.Toast.makeText(
                 this, "Camera permission is required to control the flashlight.",
                 android.widget.Toast.LENGTH_SHORT
             ).show()
         } catch (_: Exception) {
             flashEnabled = false
-            flashLabel.text = "FLASHLIGHT"
+            updateFlashIcon()
             android.widget.Toast.makeText(
                 this, "Could not switch on the flashlight.",
                 android.widget.Toast.LENGTH_SHORT
@@ -949,7 +952,7 @@ class PhantomLockActivity : Activity() {
         handler.removeCallbacks(clearMismatch)
 
         if (::fingerprintHint.isInitialized) {
-            fingerprintHint.text = "PRESS & HOLD FOR 1 SECOND"
+            fingerprintHint.text = ""
             fingerprintHint.setTextColor(0xFFE3DCD1.toInt())
             fingerprintHint.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
         }
