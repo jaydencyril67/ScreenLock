@@ -12,8 +12,6 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
 
-        // One UI 8 design system and its Samsung Experience Support Library (SESL) modules.
-        // Credentials are supplied by GitHub Actions secrets; never store tokens in source.
         maven {
             name = "OneUISESLAndroidX"
             url = uri("https://maven.pkg.github.com/tribalfs/sesl-androidx")
@@ -48,4 +46,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "ScreenLock"
-include(":app")
+include(":app", ":launcher-foundation")
