@@ -7,6 +7,10 @@ plugins {
 // Keep AndroidX aligned with Phantom's AGP 8.11.1 / compileSdk 36 toolchain.
 // Prevent transitive dependencies from upgrading to API 37 / AGP 9-only artifacts.
 configurations.configureEach {
+    // The SESL fork bundles legacy android.support classes that duplicate AndroidX core.
+    // Phantom already uses AndroidX core; keep the One UI components without that conflicting fork.
+    exclude(group = "sesl.androidx.core", module = "core")
+
     resolutionStrategy.force(
         "androidx.core:core:1.16.0",
         "androidx.core:core-ktx:1.16.0",
