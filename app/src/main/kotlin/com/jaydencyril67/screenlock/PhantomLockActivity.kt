@@ -49,6 +49,7 @@ class PhantomLockActivity : Activity() {
         private const val CAMERA_ACTION_OPEN_CAMERA = 2
         const val ACTION_PREPARE = "com.jaydencyril67.screenlock.action.PREPARE_LOCK"
         const val ACTION_AOD_PREPARE = "com.jaydencyril67.screenlock.action.AOD_PREPARE"
+        const val ACTION_AOD_WAKE = "com.jaydencyril67.screenlock.action.AOD_WAKE"
         const val ACTION_WAKE = "com.jaydencyril67.screenlock.action.WAKE_LOCK"
         const val ACTION_HOME_RESTORE = "com.jaydencyril67.screenlock.action.HOME_RESTORE"
 
@@ -146,7 +147,8 @@ class PhantomLockActivity : Activity() {
         // Prepare mode is launched as the device goes to sleep. It must NOT wake
         // the display; it only places this show-when-locked Activity in front so
         // its already-created window is ready when the user wakes the phone.
-        val prepareOnly = intent?.action == ACTION_PREPARE || intent?.action == ACTION_AOD_PREPARE
+        val prepareOnly = intent?.action == ACTION_PREPARE ||
+            intent?.action == ACTION_AOD_PREPARE || intent?.action == ACTION_AOD_WAKE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(!prepareOnly)
@@ -169,7 +171,7 @@ class PhantomLockActivity : Activity() {
 
         applyImmersiveMode()
         registerScreenOffReceiver()
-        if (intent?.action == ACTION_AOD_PREPARE) {
+        if (intent?.action == ACTION_AOD_PREPARE || intent?.action == ACTION_AOD_WAKE) {
             buildAodScreen()
         } else {
             buildLockScreen()
@@ -181,7 +183,8 @@ class PhantomLockActivity : Activity() {
         super.onNewIntent(intent)
         setIntent(intent)
         val aodPrepare = intent.action == ACTION_AOD_PREPARE
-        val prepareOnly = intent.action == ACTION_PREPARE || aodPrepare
+        val aodWake = intent.action == ACTION_AOD_WAKE
+        val prepareOnly = intent.action == ACTION_PREPARE || aodPrepare || aodWake
         val homeRestore = intent.action == ACTION_HOME_RESTORE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
@@ -201,7 +204,7 @@ class PhantomLockActivity : Activity() {
             applyImmersiveMode()
             return
         }
-        if (aodPrepare) {
+        if (aodPrepare || aodWake) {
             armed = false
             unlockPending = false
             authenticating = false
