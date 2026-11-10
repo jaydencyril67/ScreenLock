@@ -197,8 +197,7 @@ class PhantomLockActivity : Activity() {
         } else {
             @Suppress("DEPRECATION")
             window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
-            @Suppress("DEPRECATION")
-            if (prepareOnly || homeRestore) {
+            @Suppress("DEPRECATION")            if (prepareOnly || homeRestore) {
                 window.clearFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
             } else {
                 window.addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
@@ -303,8 +302,10 @@ class PhantomLockActivity : Activity() {
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.CENTER
+                Gravity.TOP or Gravity.CENTER_HORIZONTAL
             ).apply {
+                // Position the modern clock in the upper third, not screen-centred.
+                topMargin = (resources.displayMetrics.heightPixels * 0.20f).toInt()
                 leftMargin = dp(20)
                 rightMargin = dp(20)
             }
@@ -397,8 +398,7 @@ class PhantomLockActivity : Activity() {
             setPadding(0, dp(9), 0, 0)
         }
         aodSensorStack.addView(
-            fingerprintHint,
-            LinearLayout.LayoutParams(
+            fingerprintHint,            LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 dp(27)
             )
@@ -597,8 +597,7 @@ class PhantomLockActivity : Activity() {
             scaleType = ImageView.ScaleType.CENTER_CROP
             background = GradientDrawable().apply {
                 cornerRadius = dp(16).toFloat()
-                setColor(0xFF242A35.toInt())
-            }
+                setColor(0xFF242A35.toInt())            }
             clipToOutline = true
             contentDescription = "Album artwork"
         }
@@ -797,8 +796,7 @@ class PhantomLockActivity : Activity() {
             text = ""
             textSize = 9f
             letterSpacing = 0.19f
-            setTextColor(0xC9E3DCD1.toInt())
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            setTextColor(0xC9E3DCD1.toInt())            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             gravity = Gravity.CENTER
             includeFontPadding = false
             setPadding(0, dp(13), 0, 0)
@@ -997,8 +995,7 @@ class PhantomLockActivity : Activity() {
             data.data?.let(selected::add)
         }
 
-        val uris = selected.distinct()
-        if (uris.isEmpty()) return
+        val uris = selected.distinct()        if (uris.isEmpty()) return
 
         uris.forEach { uri ->
             try {
@@ -1198,7 +1195,6 @@ class PhantomLockActivity : Activity() {
             fingerprintHint.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
         }
     }
-
     private fun onFingerprintPressed() {
         if (authenticating || unlockPending) return
 
@@ -1397,8 +1393,7 @@ class PhantomLockActivity : Activity() {
         // existing singleTask lock Activity. Launching the Activity directly
         // from onUserLeaveHint races Android's transition to the launcher and
         // can silently leave Phantom behind Home on Android 11 / Samsung One UI.
-        if (!getSharedPreferences(PhantomOverlayService.PREFS, MODE_PRIVATE)
-                .getBoolean(PhantomOverlayService.PREF_ENABLED, false)) return
+        if (!getSharedPreferences(PhantomOverlayService.PREFS, MODE_PRIVATE)                .getBoolean(PhantomOverlayService.PREF_ENABLED, false)) return
 
         try {
             startService(Intent(this, PhantomOverlayService::class.java).apply {
