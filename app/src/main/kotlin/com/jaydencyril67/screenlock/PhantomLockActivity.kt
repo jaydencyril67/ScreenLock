@@ -55,6 +55,10 @@ class PhantomLockActivity : Activity() {
         @Volatile
         var isAlive: Boolean = false
             private set
+
+        @Volatile
+        var isAodVisible: Boolean = false
+            private set
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -223,6 +227,7 @@ class PhantomLockActivity : Activity() {
     }
 
     private fun buildAodScreen() {
+        isAodVisible = true
         val prefs = getSharedPreferences(PhantomOverlayService.PREFS, MODE_PRIVATE)
         val dimMode = prefs.getString(
             PhantomOverlayService.PREF_AOD_MODE,
@@ -343,6 +348,11 @@ class PhantomLockActivity : Activity() {
     }
 
     private fun buildLockScreen() {
+        isAodVisible = false
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.attributes = window.attributes.apply {
+            screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        }
         val root = FrameLayout(this).apply {
             setBackgroundColor(Color.rgb(7, 8, 12))
             isFocusableInTouchMode = true
@@ -1311,6 +1321,7 @@ class PhantomLockActivity : Activity() {
 
     override fun onDestroy() {
         isAlive = false
+        isAodVisible = false
         handler.removeCallbacksAndMessages(null)
         armRunnable = null
         if (flashEnabled) {
