@@ -344,7 +344,7 @@ class PhantomHomeActivity : AppCompatActivity() {
             setPadding(dp(5), dp(4), dp(5), dp(4))
             background = glassSurface(0x32FFFFFF, 0x36FFFFFF, 27f)
         }
-        pinnedApps.take(4).forEach { app ->
+        selectPinnedApps().take(4).forEach { app ->
             dock.addView(
                 createAppTile(app, showLabel = false, iconSize = 51),
                 LinearLayout.LayoutParams(0, dp(62), 1f)
@@ -691,7 +691,7 @@ class PhantomHomeActivity : AppCompatActivity() {
         val input = EditText(this).apply {
             setText(folder.title)
             setSelection(text.length)
-            singleLine = true
+            setSingleLine(true)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
             hint = "Folder name"
         }
