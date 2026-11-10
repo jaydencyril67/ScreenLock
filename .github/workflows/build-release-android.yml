@@ -29,6 +29,43 @@ jobs:
       - name: Check out Phantom Lock
         uses: actions/checkout@v4
 
+      - name: Require successful commit checks on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Production APKs can only be published from the main branch."
+            exit 1
+          fi
+
+          gh run list --workflow checks.yml --branch main --commit "$GITHUB_SHA" \
+            --limit 20 --json databaseId,headSha,status,conclusion > commit-checks.json
+
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          sha = os.environ["GITHUB_SHA"]
+          runs = json.loads(Path("commit-checks.json").read_text())
+          matching = [run for run in runs if run.get("headSha") == sha]
+          matching.sort(key=lambda run: int(run.get("databaseId", 0)), reverse=True)
+
+          if not matching:
+              raise SystemExit("No Commit Checks run exists for this exact commit. Run the Commit Checks workflow first.")
+
+          check = matching[0]
+          if check.get("status") != "completed" or check.get("conclusion") != "success":
+              raise SystemExit(
+                  "Commit Checks must complete successfully before production publishing. "
+                  + "Current status: " + str(check.get("status"))
+                  + "; conclusion: " + str(check.get("conclusion"))
+              )
+
+          print("Commit Checks passed for " + sha + " (run " + str(check.get("databaseId")) + ").")
+          PY
+
       - name: Calculate next Phantom Lock release version
         id: version
         env:
