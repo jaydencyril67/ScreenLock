@@ -231,7 +231,7 @@ class PhantomLockActivity : Activity() {
 
         if (dimMode) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            window.attributes = window.attributes.apply { screenBrightness = 0.025f }
+            window.attributes = window.attributes.apply { screenBrightness = 0.05f }
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             window.attributes = window.attributes.apply {
@@ -265,7 +265,7 @@ class PhantomLockActivity : Activity() {
             letterSpacing = -0.045f
             includeFontPadding = false
             gravity = Gravity.CENTER
-            setTextColor(if (dimMode) 0xFF555555.toInt() else 0xFFF1ECE3.toInt())
+            setTextColor(if (dimMode) 0xFF666666.toInt() else 0xFFF1ECE3.toInt())
         }
         dateLabel = TextView(this).apply {
             textSize = 12f
@@ -274,7 +274,7 @@ class PhantomLockActivity : Activity() {
             includeFontPadding = false
             gravity = Gravity.CENTER
             setPadding(0, dp(12), 0, 0)
-            setTextColor(if (dimMode) 0xFF383838.toInt() else 0xFFB9B0A3.toInt())
+            setTextColor(if (dimMode) 0xFF454545.toInt() else 0xFFB9B0A3.toInt())
         }
         clockStack.addView(
             clockLabel,
@@ -309,7 +309,7 @@ class PhantomLockActivity : Activity() {
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             gravity = Gravity.CENTER
             includeFontPadding = false
-            setTextColor(if (dimMode) 0xFF333333.toInt() else 0xFFAAA398.toInt())
+            setTextColor(if (dimMode) 0xFF414141.toInt() else 0xFFAAA398.toInt())
         }
         root.addView(
             battery,
@@ -327,7 +327,7 @@ class PhantomLockActivity : Activity() {
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             gravity = Gravity.CENTER
             includeFontPadding = false
-            setTextColor(if (dimMode) 0xFF292929.toInt() else 0xFF777168.toInt())
+            setTextColor(if (dimMode) 0xFF333333.toInt() else 0xFF777168.toInt())
         }
         root.addView(
             hint,
