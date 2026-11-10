@@ -3,9 +3,7 @@ package com.jaydencyril67.screenlock
 import android.app.Activity
 import android.content.Intent
 import android.animation.ValueAnimator
-import android.app.Activity
 import android.content.Context
-import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
