@@ -123,10 +123,6 @@ class PhantomOverlayService : Service() {
         getSharedPreferences(PREFS, MODE_PRIVATE)
             .getBoolean(PREF_ENABLED, false)
 
-    private fun isDimAodSelected(): Boolean =
-        getSharedPreferences(PREFS, MODE_PRIVATE)
-            .getString(PREF_AOD_MODE, AOD_MODE_WAKE) == AOD_MODE_DIM
-
     private fun launchLockScreen(action: String) {
         if (!isProtectionEnabled() || !Settings.canDrawOverlays(this)) return
 
