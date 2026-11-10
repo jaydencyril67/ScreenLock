@@ -7,27 +7,36 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
+import android.text.InputType
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.GestureDetector
 import android.widget.AutoCompleteTextView
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.ViewFlipper
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
+import dev.oneuiproject.oneui.dialog.GridMenuDialog
+import org.json.JSONArray
+import org.json.JSONObject
 import java.text.Collator
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 import kotlin.math.abs
 
 /**
@@ -39,6 +48,16 @@ import kotlin.math.abs
  */
 class PhantomHomeActivity : AppCompatActivity() {
 
+    private companion object {
+        const val PREF_HOME_FOLDERS = "phantom_home_folders"
+        const val KEY_HOME_FOLDERS = "folders"
+        const val ACTION_APP_INFO = 8101
+        const val ACTION_CREATE_FOLDER = 8102
+        const val ACTION_UNINSTALL_APP = 8103
+        const val ACTION_RENAME_FOLDER = 8104
+        const val ACTION_REMOVE_FOLDER = 8105
+    }
+
     private data class LauncherApp(
         val packageName: String,
         val activityName: String,
@@ -46,12 +65,24 @@ class PhantomHomeActivity : AppCompatActivity() {
         val icon: Drawable
     )
 
+    private data class LauncherFolder(
+        val id: String,
+        val title: String,
+        val packageNames: List<String>
+    )
+
+    private sealed class HomeItem {
+        data class App(val app: LauncherApp) : HomeItem()
+        data class Folder(val folder: LauncherFolder, val apps: List<LauncherApp>) : HomeItem()
+    }
+
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var root: FrameLayout
     private lateinit var clockLabel: TextView
     private lateinit var dateLabel: TextView
     private lateinit var homeGestureDetector: GestureDetector
     private lateinit var widgetContainer: LinearLayout
+    private lateinit var homeAppsContainer: LinearLayout
     private lateinit var widgetHost: PhantomWidgetHost
 
     private var launchableApps: List<LauncherApp> = emptyList()
@@ -123,6 +154,7 @@ class PhantomHomeActivity : AppCompatActivity() {
         super.onResume()
         launchableApps = queryLaunchableApps()
         updateClock()
+        if (::homeAppsContainer.isInitialized) renderHomeGrid()
         if (::widgetHost.isInitialized) widgetHost.render()
         handler.removeCallbacks(clockTick)
         handler.post(clockTick)
@@ -272,9 +304,17 @@ class PhantomHomeActivity : AppCompatActivity() {
         )
         widgetHost = PhantomWidgetHost(this, widgetContainer)
 
-        val pinnedApps = selectPinnedApps()
-        val homeApps = selectHomeApps(pinnedApps).take(12)
-        addAppRows(content, homeApps, 4)
+        homeAppsContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        content.addView(
+            homeAppsContainer,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+        renderHomeGrid()
 
         val searchBar = createHomeSearchBar()
         content.addView(
@@ -350,23 +390,62 @@ class PhantomHomeActivity : AppCompatActivity() {
         }
     }
 
-    private fun addAppRows(
+    private fun renderHomeGrid() {
+        if (!::homeAppsContainer.isInitialized) return
+        homeAppsContainer.removeAllViews()
+        val pinnedApps = selectPinnedApps()
+        val homeApps = selectHomeApps(pinnedApps).take(12)
+        addHomeRows(homeAppsContainer, buildHomeItems(homeApps), 4)
+    }
+
+    private fun buildHomeItems(apps: List<LauncherApp>): List<HomeItem> {
+        val appsByPackage = apps.associateBy { it.packageName }
+        val appPackages = appsByPackage.keys
+        val folderEntries = loadHomeFolders().mapNotNull { folder ->
+            val members = folder.packageNames.distinct()
+                .filter { it in appPackages }
+                .mapNotNull { appsByPackage[it] }
+            if (members.size < 2) null
+            else folder.copy(packageNames = members.map { it.packageName }) to members
+        }
+        val folderByPackage = folderEntries
+            .flatMap { entry -> entry.second.map { it.packageName to entry } }
+            .toMap()
+        val emittedFolderIds = mutableSetOf<String>()
+
+        return apps.mapNotNull { app ->
+            val entry = folderByPackage[app.packageName]
+            when {
+                entry == null -> HomeItem.App(app)
+                emittedFolderIds.add(entry.first.id) -> HomeItem.Folder(entry.first, entry.second)
+                else -> null
+            }
+        }
+    }
+
+    private fun addHomeRows(
         parent: LinearLayout,
-        apps: List<LauncherApp>,
+        items: List<HomeItem>,
         columns: Int
     ) {
-        apps.chunked(columns).forEach { rowApps ->
+        items.chunked(columns).forEach { rowItems ->
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER
             }
-            rowApps.forEach { app ->
-                row.addView(
-                    createAppTile(app, showLabel = true, iconSize = 53),
-                    LinearLayout.LayoutParams(0, dp(91), 1f)
-                )
+            rowItems.forEach { item ->
+                val tile = when (item) {
+                    is HomeItem.App -> createAppTile(
+                        item.app,
+                        showLabel = true,
+                        iconSize = 53,
+                        allowFolderCreation = true
+                    )
+                    is HomeItem.Folder -> createFolderTile(item.folder, item.apps)
+                }
+                row.addView(tile, LinearLayout.LayoutParams(0, dp(91), 1f))
             }
-            repeat((columns - rowApps.size).coerceAtLeast(0)) {
+            repeat((columns - rowItems.size).coerceAtLeast(0)) {
                 row.addView(View(this), LinearLayout.LayoutParams(0, dp(91), 1f))
             }
             parent.addView(
@@ -379,10 +458,57 @@ class PhantomHomeActivity : AppCompatActivity() {
         }
     }
 
+    private fun loadHomeFolders(): List<LauncherFolder> {
+        val raw = getSharedPreferences(PREF_HOME_FOLDERS, MODE_PRIVATE)
+            .getString(KEY_HOME_FOLDERS, "[]") ?: "[]"
+        return runCatching {
+            val array = JSONArray(raw)
+            val folders = mutableListOf<LauncherFolder>()
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val packageArray = item.optJSONArray("packages") ?: JSONArray()
+                val packages = mutableListOf<String>()
+                for (packageIndex in 0 until packageArray.length()) {
+                    val packageName = packageArray.optString(packageIndex)
+                    if (packageName.isNotBlank()) packages.add(packageName)
+                }
+                if (packages.distinct().size >= 2) {
+                    folders.add(
+                        LauncherFolder(
+                            id = item.optString("id").ifBlank { UUID.randomUUID().toString() },
+                            title = item.optString("title").ifBlank { "Folder" },
+                            packageNames = packages.distinct()
+                        )
+                    )
+                }
+            }
+            folders
+        }.getOrDefault(emptyList())
+    }
+
+    private fun saveHomeFolders(folders: List<LauncherFolder>) {
+        val array = JSONArray()
+        folders.forEach { folder ->
+            val packageArray = JSONArray()
+            folder.packageNames.distinct().forEach { packageArray.put(it) }
+            array.put(
+                JSONObject()
+                    .put("id", folder.id)
+                    .put("title", folder.title)
+                    .put("packages", packageArray)
+            )
+        }
+        getSharedPreferences(PREF_HOME_FOLDERS, MODE_PRIVATE)
+            .edit()
+            .putString(KEY_HOME_FOLDERS, array.toString())
+            .apply()
+    }
+
     private fun createAppTile(
         app: LauncherApp,
         showLabel: Boolean,
-        iconSize: Int
+        iconSize: Int,
+        allowFolderCreation: Boolean = false
     ): View {
         val tile = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -391,6 +517,10 @@ class PhantomHomeActivity : AppCompatActivity() {
             isFocusable = true
             contentDescription = app.label
             setOnClickListener { launchApp(app) }
+            setOnLongClickListener {
+                showAppActions(this, app, allowFolderCreation)
+                true
+            }
         }
 
         val icon = ImageView(this).apply {
@@ -424,6 +554,263 @@ class PhantomHomeActivity : AppCompatActivity() {
             )
         }
         return tile
+    }
+
+    private fun createFolderTile(
+        folder: LauncherFolder,
+        apps: List<LauncherApp>
+    ): View {
+        val tile = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            contentDescription = folder.title + ", folder"
+            setOnClickListener { showFolderContents(this, folder, apps) }
+            setOnLongClickListener {
+                showFolderActions(this, folder)
+                true
+            }
+        }
+
+        val iconSurface = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(7), dp(7), dp(7), dp(7))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(15).toFloat()
+                setColor(0xA82A3044.toInt())
+                setStroke(dp(1), 0x66FFFFFF)
+            }
+        }
+        apps.take(4).chunked(2).forEach { appRow ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+            }
+            appRow.forEach { app ->
+                val previewIcon = ImageView(this).apply {
+                    val drawable = app.icon.constantState?.newDrawable(resources)?.mutate() ?: app.icon
+                    setImageDrawable(drawable)
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    contentDescription = app.label
+                }
+                row.addView(
+                    previewIcon,
+                    LinearLayout.LayoutParams(dp(19), dp(19)).apply {
+                        leftMargin = dp(2)
+                        rightMargin = dp(2)
+                        topMargin = dp(1)
+                        bottomMargin = dp(1)
+                    }
+                )
+            }
+            if (appRow.size == 1) {
+                row.addView(View(this), LinearLayout.LayoutParams(dp(19), dp(19)))
+            }
+            iconSurface.addView(
+                row,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+        }
+        tile.addView(iconSurface, LinearLayout.LayoutParams(dp(53), dp(53)))
+        tile.addView(
+            text(folder.title, 10.5f, Color.WHITE, false).apply {
+                gravity = Gravity.CENTER
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                setPadding(dp(2), dp(5), dp(2), 0)
+                setShadowLayer(dp(4).toFloat(), 0f, dp(1).toFloat(), 0x66000000)
+            },
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(22)
+            )
+        )
+        return tile
+    }
+
+    private fun showFolderContents(anchor: View, folder: LauncherFolder, apps: List<LauncherApp>) {
+        val dialog = GridMenuDialog(this)
+        val appById = mutableMapOf<Int, LauncherApp>()
+        apps.forEach { app ->
+            val itemId = app.packageName.hashCode()
+            appById[itemId] = app
+            dialog.addItem(
+                GridMenuDialog.GridItem(
+                    itemId = itemId,
+                    title = app.label,
+                    icon = app.icon
+                )
+            )
+        }
+        dialog.setOnItemClickListener { item ->
+            appById[item.itemId]?.let { launchApp(it) }
+            true
+        }
+        dialog.show()
+        dialog.setAnchor(anchor)
+    }
+
+    private fun showFolderActions(anchor: View, folder: LauncherFolder) {
+        val dialog = GridMenuDialog(this)
+        dialog.addItem(
+            GridMenuDialog.GridItem(
+                ACTION_RENAME_FOLDER,
+                "Rename",
+                getDrawable(android.R.drawable.ic_menu_edit)
+            )
+        )
+        dialog.addItem(
+            GridMenuDialog.GridItem(
+                ACTION_REMOVE_FOLDER,
+                "Remove folder",
+                getDrawable(android.R.drawable.ic_menu_delete)
+            )
+        )
+        dialog.setOnItemClickListener { item ->
+            when (item.itemId) {
+                ACTION_RENAME_FOLDER -> renameFolder(folder)
+                ACTION_REMOVE_FOLDER -> {
+                    saveHomeFolders(loadHomeFolders().filterNot { it.id == folder.id })
+                    renderHomeGrid()
+                    Toast.makeText(this, "Folder removed. Its apps are back on Home.", Toast.LENGTH_SHORT).show()
+                }
+            }
+            true
+        }
+        dialog.show()
+        dialog.setAnchor(anchor)
+    }
+
+    private fun renameFolder(folder: LauncherFolder) {
+        val input = EditText(this).apply {
+            setText(folder.title)
+            setSelection(text.length)
+            singleLine = true
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
+            hint = "Folder name"
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Rename folder")
+            .setView(input)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Save") { _, _ ->
+                val title = input.text.toString().trim().ifBlank { "Folder" }
+                val updated = loadHomeFolders().map {
+                    if (it.id == folder.id) it.copy(title = title) else it
+                }
+                saveHomeFolders(updated)
+                renderHomeGrid()
+            }
+            .show()
+    }
+
+    private fun showCreateFolderDialog(anchorApp: LauncherApp) {
+        val existingFolders = loadHomeFolders()
+        val candidates = selectHomeApps(selectPinnedApps()).filter { app ->
+            existingFolders.none { folder -> app.packageName in folder.packageNames }
+        }
+        if (candidates.size < 2) {
+            Toast.makeText(this, "There are not enough Home apps to create a folder.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val selectedPackages = mutableSetOf(anchorApp.packageName)
+        val labels = candidates.map { it.label }.toTypedArray()
+        val checked = BooleanArray(candidates.size) {
+            candidates[it].packageName == anchorApp.packageName
+        }
+        lateinit var dialog: AlertDialog
+        dialog = AlertDialog.Builder(this)
+            .setTitle("Create folder")
+            .setMessage("Choose at least two apps to group together.")
+            .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
+                val packageName = candidates[which].packageName
+                if (isChecked) selectedPackages.add(packageName)
+                else selectedPackages.remove(packageName)
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.isEnabled = selectedPackages.size >= 2
+            }
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Create") { _, _ ->
+                if (selectedPackages.size < 2) {
+                    Toast.makeText(this, "Select at least two apps.", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                val nextNumber = existingFolders.size + 1
+                val folder = LauncherFolder(
+                    id = UUID.randomUUID().toString(),
+                    title = "Folder " + nextNumber,
+                    packageNames = selectedPackages.toList()
+                )
+                saveHomeFolders(existingFolders + folder)
+                renderHomeGrid()
+                Toast.makeText(this, folder.title + " created.", Toast.LENGTH_SHORT).show()
+            }
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = selectedPackages.size >= 2
+        }
+        dialog.show()
+    }
+
+    private fun showAppActions(anchor: View, app: LauncherApp, allowFolderCreation: Boolean) {
+        val dialog = GridMenuDialog(this)
+        dialog.addItem(
+            GridMenuDialog.GridItem(
+                ACTION_APP_INFO,
+                "App info",
+                getDrawable(android.R.drawable.ic_menu_info_details)
+            )
+        )
+        if (allowFolderCreation) {
+            dialog.addItem(
+                GridMenuDialog.GridItem(
+                    ACTION_CREATE_FOLDER,
+                    "Create folder",
+                    getDrawable(android.R.drawable.ic_menu_add)
+                )
+            )
+        }
+
+        val isSystemApp = runCatching {
+            packageManager.getApplicationInfo(app.packageName, 0).flags and
+                android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0
+        }.getOrDefault(true)
+        if (!isSystemApp && app.packageName != packageName) {
+            dialog.addItem(
+                GridMenuDialog.GridItem(
+                    ACTION_UNINSTALL_APP,
+                    "Uninstall",
+                    getDrawable(android.R.drawable.ic_menu_delete)
+                )
+            )
+        }
+
+        dialog.setOnItemClickListener { item ->
+            when (item.itemId) {
+                ACTION_APP_INFO -> {
+                    startActivity(
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.parse("package:" + app.packageName)
+                        }
+                    )
+                }
+                ACTION_CREATE_FOLDER -> showCreateFolderDialog(app)
+                ACTION_UNINSTALL_APP -> {
+                    startActivity(
+                        Intent(Intent.ACTION_DELETE, Uri.parse("package:" + app.packageName))
+                    )
+                }
+            }
+            true
+        }
+        dialog.show()
+        dialog.setAnchor(anchor)
     }
 
     private fun selectPinnedApps(): List<LauncherApp> {
