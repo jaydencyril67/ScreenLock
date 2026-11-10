@@ -70,4 +70,5 @@ dependencies {
     // One UI 8 component library. Its SESL dependencies are resolved from
     // the authenticated GitHub Maven repositories declared in settings.gradle.kts.
     implementation("io.github.tribalfs:oneui-design:0.9.4+oneui8")
+    implementation("io.github.oneuiproject:icons:1.1.0")
 }
