@@ -129,7 +129,7 @@ class MainActivity : AppCompatActivity() {
             radius = dp(20).toFloat()
             cardElevation = 0f
             setCardBackgroundColor(0xFF10182A.toInt())
-            strokeColor = ColorStateList.valueOf(0xFF273653.toInt())
+            setStrokeColor(0xFF273653.toInt())
             strokeWidth = dp(1)
             useCompatPadding = false
             addView(statusContent)
