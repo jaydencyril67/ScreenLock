@@ -1274,7 +1274,7 @@ class PhantomLockActivity : Activity() {
         val now = Date()
         clockLabel.text = formatClockTime(now)
         dateLabel.text = SimpleDateFormat(
-            "EEEE  ·  d MMMM yyyy",
+            "EEEE, d MMMM",
             Locale.getDefault()
         ).format(now).uppercase(Locale.getDefault())
     }
