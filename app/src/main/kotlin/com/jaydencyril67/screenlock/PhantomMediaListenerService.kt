@@ -130,17 +130,51 @@ class PhantomMediaListenerService : NotificationListenerService() {
         }
     }
 
+    private fun refreshFromListener() {
+        try {
+            val manager = getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
+            val sessions = manager.getActiveSessions(
+                ComponentName(this, PhantomMediaListenerService::class.java)
+            )
+            val eligible = sessions.filter { isLocalAudioSession(it) }
+            val selected = eligible.firstOrNull {
+                it.playbackState?.state == android.media.session.PlaybackState.STATE_PLAYING
+            } ?: eligible.firstOrNull()
+
+            if (observedController !== selected) {
+                observedController?.unregisterCallback(controllerCallback)
+                observedController = selected
+                observedController?.registerCallback(controllerCallback)
+            }
+            publish(selected)
+            sendStateChanged()
+        } catch (_: Exception) {
+            observedController?.unregisterCallback(controllerCallback)
+            observedController = null
+            publish(null)
+            sendStateChanged()
+        }
+    }
+
     override fun onListenerConnected() {
         super.onListenerConnected()
-        refreshSessions(this)
+        refreshFromListener()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
-        refreshSessions(this)
+        refreshFromListener()
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
-        refreshSessions(this)
+        refreshFromListener()
+    }
+
+    override fun onListenerDisconnected() {
+        observedController?.unregisterCallback(controllerCallback)
+        observedController = null
+        publish(null)
+        sendStateChanged()
+        super.onListenerDisconnected()
     }
 
     private fun sendStateChanged() {
