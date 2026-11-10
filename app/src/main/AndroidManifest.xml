@@ -44,9 +44,15 @@
             android:exported="false" />
 
         <service
-            android:name=".LocalMusicPlaybackService"
+            android:name=".PhantomMediaListenerService"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
             android:enabled="true"
-            android:exported="false" />
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
 
         <receiver
             android:name=".PhantomBootReceiver"
