@@ -283,17 +283,19 @@ class MainActivity : Activity() {
             )
         )
 
+        // Keep the branded entry splash visible for the same 3-second
+        // minimum used across the KingsHall app experience.
         Handler(Looper.getMainLooper()).postDelayed({
             if (splash.parent === content) {
                 splash.animate()
                     .alpha(0f)
-                    .setDuration(180L)
+                    .setDuration(220L)
                     .withEndAction {
                         (splash.parent as? ViewGroup)?.removeView(splash)
                     }
                     .start()
             }
-        }, 1150L)
+        }, 3_000L)
     }
 
     private fun refreshDashboard() {
