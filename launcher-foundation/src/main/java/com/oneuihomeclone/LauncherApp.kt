@@ -100,7 +100,7 @@ internal fun summarizeCrashLog(content: String): PreviousCrashSummary {
  *     view inflation) is staged for v0.2.x — this plumbing exists so that work can
  *     slot in without lifecycle rewrites.
  */
-class LauncherApp : Application() {
+open class LauncherApp : Application() {
 
     private val crashLogFile: File
         get() = File(filesDir, CRASH_LOG_NAME)
