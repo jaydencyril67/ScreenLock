@@ -112,8 +112,12 @@ class PhantomMediaListenerService : NotificationListenerService() {
     private val controllerCallback = object : MediaController.Callback() {
         override fun onMetadataChanged(metadata: MediaMetadata?) {
             if (observedController === activeController) {
-                currentMetadata = metadata
-                sendStateChanged()
+                if (observedController?.let { isLocalAudioSession(it) } != true) {
+                    refreshFromListener()
+                } else {
+                    currentMetadata = metadata
+                    sendStateChanged()
+                }
             }
         }
 
@@ -126,7 +130,7 @@ class PhantomMediaListenerService : NotificationListenerService() {
         }
 
         override fun onSessionDestroyed() {
-            refreshSessions(this@PhantomMediaListenerService)
+            refreshFromListener()
         }
     }
 
