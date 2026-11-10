@@ -25,6 +25,7 @@ class PhantomOverlayService : Service() {
         const val ACTION_RESTORE_LOCK = "com.jaydencyril67.screenlock.action.RESTORE_LOCK"
         const val PREFS = "phantom_lock_settings"
         const val PREF_ENABLED = "protection_enabled"
+        const val PREF_SKIP_HOME_RESTORE_ONCE = "skip_home_restore_once"
 
         private const val TAG = "PhantomLock"
         private const val CHANNEL_ID = "phantom_lock_service"
