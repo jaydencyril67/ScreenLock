@@ -499,15 +499,14 @@ class PhantomLockActivity : Activity() {
                         fingerprintTouchActive = true
                         fingerprintTouchStartedArmed = armed
 
-                        if (!fingerprintTouchStartedArmed) {
-                            // Show the mismatch as soon as the finger touches down.
-                            // ACTION_UP deliberately does not trigger a second response.
-                            onFingerprintPressed()
-                        } else if (!authenticating && !unlockPending) {
-                            // Unlock while the finger is still held. No release is needed.
+                        if (!authenticating && !unlockPending) {
+                            // Both armed and unarmed touches use the same continuous
+                            // one-second hold. The result is evaluated only at the threshold:
+                            // armed = unlock; unarmed = mismatch.
                             val hold = Runnable {
-                                if (fingerprintTouchActive && fingerprintTouchStartedArmed &&
-                                    armed && !authenticating && !unlockPending
+                                if (fingerprintTouchActive &&
+                                    armed == fingerprintTouchStartedArmed &&
+                                    !authenticating && !unlockPending
                                 ) {
                                     onFingerprintPressed()
                                 }
