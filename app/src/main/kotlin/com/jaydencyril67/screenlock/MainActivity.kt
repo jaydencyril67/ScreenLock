@@ -1,9 +1,9 @@
 package com.jaydencyril67.screenlock
 
-import android.app.Activity
 import android.content.Intent
 import android.animation.ValueAnimator
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -29,8 +29,11 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.AppCompatButton
+import com.google.android.material.card.MaterialCardView
 
-class MainActivity : Activity() {
+class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val REQUEST_WALLPAPER = 4170
@@ -118,20 +121,28 @@ class MainActivity : Activity() {
             buttonParams().apply { topMargin = dp(18) }
         )
 
-        val statusCard = LinearLayout(this).apply {
+        val statusContent = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(18), dp(18), dp(18))
-            background = rounded(0xFF10182A.toInt(), 20f, 0xFF273653.toInt())
+        }
+        val statusCard = MaterialCardView(this).apply {
+            radius = dp(20).toFloat()
+            cardElevation = 0f
+            setCardBackgroundColor(0xFF10182A.toInt())
+            strokeColor = ColorStateList.valueOf(0xFF273653.toInt())
+            strokeWidth = dp(1)
+            useCompatPadding = false
+            addView(statusContent)
         }
         val statusEyebrow = label("PROTECTION STATUS", 9f, 0xFF91A7D0.toInt(), true)
         statusEyebrow.letterSpacing = 0.16f
-        statusCard.addView(statusEyebrow)
+        statusContent.addView(statusEyebrow)
         statusTitle = label("Checking setup…", 19f, Color.WHITE, true).apply {
             setPadding(0, dp(9), 0, dp(5))
         }
-        statusCard.addView(statusTitle)
+        statusContent.addView(statusTitle)
         statusDetails = label("", 12f, 0xFFAAB6CE.toInt(), false)
-        statusCard.addView(statusDetails)
+        statusContent.addView(statusDetails)
         val statusParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
@@ -632,14 +643,14 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun actionButton(text: String, color: Int) = Button(this).apply {
+    private fun actionButton(text: String, color: Int) = AppCompatButton(this).apply {
         this.text = text
         isAllCaps = false
         textSize = 11f
         letterSpacing = 0.04f
         setTextColor(Color.WHITE)
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-        background = rounded(color, 18f)
+        backgroundTintList = ColorStateList.valueOf(color)
         elevation = 0f
         minHeight = dp(56)
         minimumHeight = dp(56)
