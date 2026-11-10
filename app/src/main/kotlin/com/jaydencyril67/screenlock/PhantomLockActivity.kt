@@ -48,6 +48,7 @@ class PhantomLockActivity : Activity() {
         private const val CAMERA_ACTION_FLASH = 1
         private const val CAMERA_ACTION_OPEN_CAMERA = 2
         const val ACTION_PREPARE = "com.jaydencyril67.screenlock.action.PREPARE_LOCK"
+        const val ACTION_AOD_PREPARE = "com.jaydencyril67.screenlock.action.AOD_PREPARE"
         const val ACTION_WAKE = "com.jaydencyril67.screenlock.action.WAKE_LOCK"
         const val ACTION_HOME_RESTORE = "com.jaydencyril67.screenlock.action.HOME_RESTORE"
 
@@ -141,7 +142,7 @@ class PhantomLockActivity : Activity() {
         // Prepare mode is launched as the device goes to sleep. It must NOT wake
         // the display; it only places this show-when-locked Activity in front so
         // its already-created window is ready when the user wakes the phone.
-        val prepareOnly = intent?.action == ACTION_PREPARE
+        val prepareOnly = intent?.action == ACTION_PREPARE || intent?.action == ACTION_AOD_PREPARE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(!prepareOnly)
@@ -164,14 +165,19 @@ class PhantomLockActivity : Activity() {
 
         applyImmersiveMode()
         registerScreenOffReceiver()
-        buildLockScreen()
+        if (intent?.action == ACTION_AOD_PREPARE) {
+            buildAodScreen()
+        } else {
+            buildLockScreen()
+        }
         handler.post(clockTick)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        val prepareOnly = intent.action == ACTION_PREPARE
+        val aodPrepare = intent.action == ACTION_AOD_PREPARE
+        val prepareOnly = intent.action == ACTION_PREPARE || aodPrepare
         val homeRestore = intent.action == ACTION_HOME_RESTORE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
@@ -191,6 +197,16 @@ class PhantomLockActivity : Activity() {
             applyImmersiveMode()
             return
         }
+        if (aodPrepare) {
+            armed = false
+            unlockPending = false
+            authenticating = false
+            armRunnable?.let(handler::removeCallbacks)
+            handler.removeCallbacks(clearMismatch)
+            buildAodScreen()
+            applyImmersiveMode()
+            return
+        }
         armed = false
         unlockPending = false
         authenticating = false
@@ -204,6 +220,126 @@ class PhantomLockActivity : Activity() {
         fingerprintView?.alpha = 1f
         fingerprintView?.scaleX = 1f
         fingerprintView?.scaleY = 1f
+    }
+
+    private fun buildAodScreen() {
+        val prefs = getSharedPreferences(PhantomOverlayService.PREFS, MODE_PRIVATE)
+        val dimMode = prefs.getString(
+            PhantomOverlayService.PREF_AOD_MODE,
+            PhantomOverlayService.AOD_MODE_WAKE
+        ) == PhantomOverlayService.AOD_MODE_DIM
+
+        if (dimMode) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            window.attributes = window.attributes.apply { screenBrightness = 0.025f }
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            window.attributes = window.attributes.apply {
+                screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+            }
+        }
+
+        val root = FrameLayout(this).apply {
+            setBackgroundColor(Color.BLACK)
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Phantom always-on display. Touch to open the lockscreen."
+            setOnClickListener {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                window.attributes = window.attributes.apply {
+                    screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                }
+                buildLockScreen()
+                applyImmersiveMode()
+            }
+        }
+
+        val clockStack = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            isClickable = false
+        }
+        clockLabel = TextView(this).apply {
+            textSize = 72f
+            typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
+            letterSpacing = -0.045f
+            includeFontPadding = false
+            gravity = Gravity.CENTER
+            setTextColor(if (dimMode) 0xFF555555.toInt() else 0xFFF1ECE3.toInt())
+        }
+        dateLabel = TextView(this).apply {
+            textSize = 12f
+            letterSpacing = 0.16f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            includeFontPadding = false
+            gravity = Gravity.CENTER
+            setPadding(0, dp(12), 0, 0)
+            setTextColor(if (dimMode) 0xFF383838.toInt() else 0xFFB9B0A3.toInt())
+        }
+        clockStack.addView(
+            clockLabel,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(104)
+            )
+        )
+        clockStack.addView(
+            dateLabel,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(34)
+            )
+        )
+        root.addView(
+            clockStack,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER
+            ).apply {
+                leftMargin = dp(20)
+                rightMargin = dp(20)
+            }
+        )
+
+        val battery = TextView(this).apply {
+            text = readBatteryPercent()
+            textSize = 10f
+            letterSpacing = 0.12f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            setTextColor(if (dimMode) 0xFF333333.toInt() else 0xFFAAA398.toInt())
+        }
+        root.addView(
+            battery,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                dp(28),
+                Gravity.BOTTOM
+            ).apply { bottomMargin = dp(48) }
+        )
+
+        val hint = TextView(this).apply {
+            text = "TOUCH TO OPEN"
+            textSize = 8f
+            letterSpacing = 0.2f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            setTextColor(if (dimMode) 0xFF292929.toInt() else 0xFF777168.toInt())
+        }
+        root.addView(
+            hint,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                dp(24),
+                Gravity.BOTTOM
+            ).apply { bottomMargin = dp(18) }
+        )
+
+        setContentView(root)
+        updateClock()
     }
 
     private fun buildLockScreen() {
@@ -332,19 +468,19 @@ class PhantomLockActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                cornerRadius = dp(18).toFloat()
-                setColor(0xA9101218.toInt())
-                setStroke(dp(1), 0x35FFFFFF)
+                cornerRadius = dp(22).toFloat()
+                setColor(0xD0161A22.toInt())
+                setStroke(dp(1), 0x48FFFFFF)
             }
             visibility = View.GONE
-            setPadding(dp(14), dp(12), dp(14), dp(11))
+            setPadding(dp(16), dp(15), dp(16), dp(14))
             clipToOutline = true
         }
         val mediaHeading = TextView(this).apply {
             text = "NOW PLAYING"
-            textSize = 8f
-            letterSpacing = 0.19f
-            setTextColor(0xB8D8C9B7.toInt())
+            textSize = 9f
+            letterSpacing = 0.2f
+            setTextColor(0xFFD6B88F.toInt())
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             includeFontPadding = false
         }
@@ -363,31 +499,31 @@ class PhantomLockActivity : Activity() {
         mediaArtwork = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
             background = GradientDrawable().apply {
-                cornerRadius = dp(12).toFloat()
-                setColor(0xFF20232B.toInt())
+                cornerRadius = dp(16).toFloat()
+                setColor(0xFF242A35.toInt())
             }
             clipToOutline = true
             contentDescription = "Album artwork"
         }
         mediaMainRow.addView(
             mediaArtwork,
-            LinearLayout.LayoutParams(dp(64), dp(64)).apply { marginEnd = dp(13) }
+            LinearLayout.LayoutParams(dp(74), dp(74)).apply { marginEnd = dp(15) }
         )
         val mediaTextColumn = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
         }
         mediaTitle = TextView(this).apply {
-            textSize = 14f
-            setTextColor(0xFFF5F1EA.toInt())
+            textSize = 15f
+            setTextColor(0xFFFFF9F0.toInt())
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             includeFontPadding = false
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
         }
         mediaSubtitle = TextView(this).apply {
-            textSize = 11f
-            setTextColor(0xBFCAC1B7.toInt())
+            textSize = 12f
+            setTextColor(0xFFC4BBAF.toInt())
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
             includeFontPadding = false
             maxLines = 1
@@ -433,9 +569,9 @@ class PhantomLockActivity : Activity() {
         mediaNext = mediaControl("›", "Next track") {
             sendMusicCommand(LocalMusicPlaybackService.ACTION_NEXT)
         }
-        mediaControls.addView(mediaPrevious, LinearLayout.LayoutParams(dp(42), dp(40)))
-        mediaControls.addView(mediaPlayPause, LinearLayout.LayoutParams(dp(46), dp(40)))
-        mediaControls.addView(mediaNext, LinearLayout.LayoutParams(dp(42), dp(40)))
+        mediaControls.addView(mediaPrevious, LinearLayout.LayoutParams(dp(44), dp(44)))
+        mediaControls.addView(mediaPlayPause, LinearLayout.LayoutParams(dp(52), dp(46)))
+        mediaControls.addView(mediaNext, LinearLayout.LayoutParams(dp(44), dp(44)))
         mediaControls.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         mediaContainer.addView(
             mediaControls,
@@ -452,8 +588,14 @@ class PhantomLockActivity : Activity() {
             setTextColor(0xFFE4C49A.toInt())
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             includeFontPadding = false
-            setPadding(dp(10), dp(9), 0, dp(9))
-            gravity = Gravity.CENTER_VERTICAL or Gravity.END
+            setPadding(dp(13), dp(9), dp(13), dp(9))
+            gravity = Gravity.CENTER_VERTICAL or Gravity.CENTER_HORIZONTAL
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(12).toFloat()
+                setColor(0x1FE4C49A)
+                setStroke(dp(1), 0x35E4C49A)
+            }
             isClickable = true
             isFocusable = true
             contentDescription = "Choose local music files"
@@ -463,8 +605,8 @@ class PhantomLockActivity : Activity() {
             mediaChoose,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(27)
-            )
+                dp(34)
+            ).apply { topMargin = dp(5) }
         )
         contentStack.addView(
             mediaContainer,
