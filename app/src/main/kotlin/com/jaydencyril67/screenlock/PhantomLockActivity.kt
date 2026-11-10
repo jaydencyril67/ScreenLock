@@ -20,6 +20,8 @@ import android.os.Bundle
 import android.os.CancellationSignal
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -77,6 +79,8 @@ class PhantomLockActivity : Activity() {
     private lateinit var mediaChoose: TextView
     private var fingerprintView: ImageView? = null
     private var externalShortcutLaunched = false
+    private var externalNavigationInProgress = false
+    private var lastNavigationRestoreAt = 0L
     private var flashEnabled = false
     private var flashCameraId: String? = null
     private var pendingCameraAction = CAMERA_ACTION_NONE
@@ -1137,20 +1141,52 @@ class PhantomLockActivity : Activity() {
         return super.onKeyDown(keyCode, event)
     }
 
+    override fun onResume() {
+        super.onResume()
+        // An allowed external shortcut (camera or file picker) has returned.
+        externalNavigationInProgress = false
+    }
+
+    override fun onPause() {
+        // HOME/Recents and navigation transitions do not always produce an
+        // identical callback sequence on Samsung's Android 11 build. Keep a
+        // lifecycle fallback, while excluding permission prompts, the camera,
+        // the music picker, biometric UI and display-off transitions.
+        if (!externalNavigationInProgress &&
+            !externalShortcutLaunched &&
+            !authenticating &&
+            pendingCameraAction == CAMERA_ACTION_NONE &&
+            !isFinishing &&
+            !isDestroyed
+        ) {
+            requestNavigationRestore()
+        }
+        super.onPause()
+    }
+
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         if (isFinishing || isDestroyed) return
         if (externalShortcutLaunched) {
             externalShortcutLaunched = false
+            externalNavigationInProgress = true
             return
         }
+        requestNavigationRestore()
+    }
 
-        // Let the already-running foreground protection service restore the
-        // existing singleTask lock Activity. Launching the Activity directly
-        // from onUserLeaveHint races Android's transition to the launcher and
-        // can silently leave Phantom behind Home on Android 11 / Samsung One UI.
+    private fun requestNavigationRestore() {
+        val powerManager = getSystemService(POWER_SERVICE) as? PowerManager
+        if (powerManager?.isInteractive != true) return
+
         if (!getSharedPreferences(PhantomOverlayService.PREFS, MODE_PRIVATE)
                 .getBoolean(PhantomOverlayService.PREF_ENABLED, false)) return
+
+        // onUserLeaveHint() and onPause() can both fire for one navigation
+        // action. Debounce them so the service receives one restore request.
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastNavigationRestoreAt < 750L) return
+        lastNavigationRestoreAt = now
 
         try {
             startService(Intent(this, PhantomOverlayService::class.java).apply {
