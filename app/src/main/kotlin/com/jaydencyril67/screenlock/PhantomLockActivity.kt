@@ -48,8 +48,7 @@ class PhantomLockActivity : Activity() {
         private const val CAMERA_ACTION_FLASH = 1
         private const val CAMERA_ACTION_OPEN_CAMERA = 2
         const val ACTION_PREPARE = "com.jaydencyril67.screenlock.action.PREPARE_LOCK"
-        const val ACTION_AOD_PREPARE = "com.jaydencyril67.screenlock.action.AOD_PREPARE"
-        const val ACTION_AOD_WAKE = "com.jaydencyril67.screenlock.action.AOD_WAKE"
+        const val ACTION_AOD_SHOW = "com.jaydencyril67.screenlock.action.AOD_SHOW"
         const val ACTION_WAKE = "com.jaydencyril67.screenlock.action.WAKE_LOCK"
         const val ACTION_HOME_RESTORE = "com.jaydencyril67.screenlock.action.HOME_RESTORE"
 
@@ -114,13 +113,10 @@ class PhantomLockActivity : Activity() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_SCREEN_OFF -> {
-                    // Change the already-visible lock Activity into AOD in place.
-                    // Do not ask the background service to start another Activity here:
-                    // Android 11 can defer that launch until the next screen-on event.
+                    // Reset any in-progress unlock gesture. The foreground service
+                    // owns the AOD session and starts the visible AOD Activity.
                     armed = false
                     unlockPending = false
-                    buildAodScreen()
-                    applyImmersiveMode()
                     armRunnable?.let(handler::removeCallbacks)
                     armRunnable = null
                     handler.removeCallbacks(clearMismatch)
@@ -147,11 +143,9 @@ class PhantomLockActivity : Activity() {
         super.onCreate(savedInstanceState)
         isAlive = true
 
-        // Prepare mode is launched as the device goes to sleep. It must NOT wake
-        // the display; it only places this show-when-locked Activity in front so
-        // its already-created window is ready when the user wakes the phone.
-        val prepareOnly = intent?.action == ACTION_PREPARE ||
-            intent?.action == ACTION_AOD_PREPARE || intent?.action == ACTION_AOD_WAKE
+        // AOD starts at screen-off and must turn the display on with its own
+        // low-brightness window. Only the legacy prepare action stays passive.
+        val prepareOnly = intent?.action == ACTION_PREPARE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(!prepareOnly)
@@ -174,7 +168,7 @@ class PhantomLockActivity : Activity() {
 
         applyImmersiveMode()
         registerScreenOffReceiver()
-        if (intent?.action == ACTION_AOD_PREPARE || intent?.action == ACTION_AOD_WAKE) {
+        if (intent?.action == ACTION_AOD_SHOW) {
             buildAodScreen()
         } else {
             buildLockScreen()
@@ -185,9 +179,8 @@ class PhantomLockActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        val aodPrepare = intent.action == ACTION_AOD_PREPARE
-        val aodWake = intent.action == ACTION_AOD_WAKE
-        val prepareOnly = intent.action == ACTION_PREPARE || aodPrepare || aodWake
+        val aodShow = intent.action == ACTION_AOD_SHOW
+        val prepareOnly = intent.action == ACTION_PREPARE
         val homeRestore = intent.action == ACTION_HOME_RESTORE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
@@ -207,7 +200,7 @@ class PhantomLockActivity : Activity() {
             applyImmersiveMode()
             return
         }
-        if (aodPrepare || aodWake) {
+        if (aodShow) {
             armed = false
             unlockPending = false
             authenticating = false
@@ -240,13 +233,14 @@ class PhantomLockActivity : Activity() {
             PhantomOverlayService.AOD_MODE_WAKE
         ) == PhantomOverlayService.AOD_MODE_DIM
 
-        if (dimMode) {
-            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            window.attributes = window.attributes.apply { screenBrightness = 0.05f }
-        } else {
-            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            window.attributes = window.attributes.apply {
-                screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        // Both selections are real visible AOD sessions. They differ by brightness,
+        // not by whether Android is allowed to turn the screen off.
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.attributes = window.attributes.apply {
+            screenBrightness = if (dimMode) {
+                0.05f
+            } else {
+                WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
             }
         }
 
@@ -256,10 +250,6 @@ class PhantomLockActivity : Activity() {
             isFocusable = true
             contentDescription = "Phantom always-on display. Touch to open the lockscreen."
             setOnClickListener {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                window.attributes = window.attributes.apply {
-                    screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-                }
                 buildLockScreen()
                 applyImmersiveMode()
             }
@@ -438,7 +428,6 @@ class PhantomLockActivity : Activity() {
     }
 
     private fun buildLockScreen() {
-        if (isAodVisible) releaseAodScreenHold()
         isAodVisible = false
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         window.attributes = window.attributes.apply {
@@ -1293,19 +1282,7 @@ class PhantomLockActivity : Activity() {
     }
 
     private fun finishAfterFingerprintUnlock() {
-        if (isAodVisible) releaseAodScreenHold()
         finish()
-    }
-
-    private fun releaseAodScreenHold() {
-        try {
-            startService(
-                Intent(this, PhantomOverlayService::class.java)
-                    .setAction(PhantomOverlayService.ACTION_AOD_EXIT)
-            )
-        } catch (_: Exception) {
-            // The service releases its wake lock when protection stops or the process exits.
-        }
     }
 
     private fun showMismatch() {
