@@ -23,6 +23,9 @@ class PhantomOverlayService : Service() {
         const val ACTION_RESTORE_LOCK = "com.jaydencyril67.screenlock.action.RESTORE_LOCK"
         const val PREFS = "phantom_lock_settings"
         const val PREF_ENABLED = "protection_enabled"
+        const val PREF_AOD_MODE = "aod_mode"
+        const val AOD_MODE_DIM = "dim"
+        const val AOD_MODE_WAKE = "wake"
 
         private const val TAG = "PhantomLock"
         private const val CHANNEL_ID = "phantom_lock_service"
@@ -49,7 +52,7 @@ class PhantomOverlayService : Service() {
                             // Recovery path for process death, missed screen-off events,
                             // or a Samsung power-management restart while the display slept.
                             Log.w(TAG, "No prepared lock activity found; using screen-on fallback")
-                            launchLockScreen(PhantomLockActivity.ACTION_WAKE)
+                            launchLockScreen(PhantomLockActivity.ACTION_AOD_PREPARE)
                         }
                     }
                 }
@@ -115,12 +118,10 @@ class PhantomOverlayService : Service() {
     private fun prepareLockScreen() {
         if (!isProtectionEnabled() || !Settings.canDrawOverlays(this)) return
 
-        if (PhantomLockActivity.isAlive) {
-            Log.d(TAG, "Phantom lock activity already prepared")
-            return
-        }
-
-        launchLockScreen(PhantomLockActivity.ACTION_PREPARE)
+        // Keep a minimal AOD surface prepared underneath the sleeping display.
+        // The Activity selects low-brightness/keep-awake or normal wake behavior
+        // from the user's saved setup preference.
+        launchLockScreen(PhantomLockActivity.ACTION_AOD_PREPARE)
     }
 
     private fun launchLockScreen(action: String) {
