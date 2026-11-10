@@ -425,30 +425,28 @@ class PhantomLockActivity : Activity() {
             )
         )
 
-        // Plain system information sits directly on the wallpaper.
+        // Match the AOD battery indicator: centred, low on the screen,
+        // with identical typography, colour and bottom spacing.
         batteryLabel = TextView(this).apply {
             text = readBatteryPercent()
-            textSize = 11f
-            letterSpacing = 0.08f
-            setTextColor(0xDDE8E7E4.toInt())
+            textSize = 10f
+            letterSpacing = 0.12f
+            setTextColor(0xFFAAA398.toInt())
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             gravity = Gravity.CENTER
             includeFontPadding = false
             isClickable = true
             isFocusable = true
-            contentDescription = "Battery status"
+            contentDescription = "Tap to arm fingerprint unlock"
             setOnClickListener { armFingerprint() }
         }
         root.addView(
             batteryLabel,
             FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
                 dp(28),
-                Gravity.TOP or Gravity.END
-            ).apply {
-                topMargin = dp(29)
-                marginEnd = dp(25)
-            }
+                Gravity.BOTTOM
+            ).apply { bottomMargin = dp(8) }
         )
 
         clockLabel = TextView(this).apply {
