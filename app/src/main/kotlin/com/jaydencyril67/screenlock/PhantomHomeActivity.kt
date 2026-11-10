@@ -1,6 +1,7 @@
 package com.jaydencyril67.screenlock
 
 import android.app.Activity
+import android.app.SearchManager
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
@@ -9,7 +10,6 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.provider.SearchManager
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -463,7 +463,7 @@ class PhantomHomeActivity : Activity() {
             setHintTextColor(0xAFFFFFFF.toInt())
             setTextColor(Color.WHITE)
             textSize = 14f
-            singleLine = true
+            setSingleLine(true)
             background = glassSurface(0x30FFFFFF, 0x40FFFFFF, 18f)
             setPadding(dp(16), 0, dp(16), 0)
             compoundDrawablePadding = dp(8)
@@ -486,7 +486,7 @@ class PhantomHomeActivity : Activity() {
         }
         scroll.addView(
             appsContainer,
-            ScrollView.LayoutParams(
+            FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
