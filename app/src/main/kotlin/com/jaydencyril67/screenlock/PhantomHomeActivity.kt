@@ -398,25 +398,13 @@ class PhantomHomeActivity : Activity() {
             setOnClickListener { launchApp(app) }
         }
 
-        // One UI-inspired squircle icon plate: a consistent surface and larger
-        // icon area, without replacing the identity of the app's own logo.
-        val iconFrame = FrameLayout(this).apply {
-            background = appIconSurface(app)
-            clipToOutline = true
-            elevation = dp(2).toFloat()
-        }
         val icon = ImageView(this).apply {
-            setImageDrawable(app.icon)
+            setImageDrawable(PhantomThemedIconDrawable(app.packageName, app.icon))
             scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = app.label
-            setPadding(dp(3), dp(3), dp(3), dp(3))
         }
-        iconFrame.addView(
-            icon,
-            FrameLayout.LayoutParams(dp(54), dp(54), Gravity.CENTER)
-        )
         tile.addView(
-            iconFrame,
+            icon,
             LinearLayout.LayoutParams(dp(60), dp(60)).apply {
                 gravity = Gravity.CENTER
             }
@@ -429,7 +417,7 @@ class PhantomHomeActivity : Activity() {
                     maxLines = 1
                     ellipsize = android.text.TextUtils.TruncateAt.END
                     setPadding(dp(2), dp(5), dp(2), 0)
-                    setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
+                    setShadowLayer(dp(5).toFloat(), 0f, dp(1).toFloat(), 0x66000000)
                 },
                 LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -438,34 +426,6 @@ class PhantomHomeActivity : Activity() {
             )
         }
         return tile
-    }
-
-    private fun appIconSurface(app: LauncherApp): GradientDrawable {
-        val packageName = app.packageName.lowercase(Locale.ROOT)
-        val colors = when {
-            packageName.contains("dialer") || packageName.contains("phone") ->
-                intArrayOf(0xFFE5F5ED.toInt(), 0xFFC8EBDD.toInt())
-            packageName.contains("messag") || packageName.contains("sms") ->
-                intArrayOf(0xFFE9F2FF.toInt(), 0xFFD4E2FA.toInt())
-            packageName.contains("camera") ->
-                intArrayOf(0xFFF2F0EC.toInt(), 0xFFDAD7D1.toInt())
-            packageName.contains("gallery") || packageName.contains("photo") ->
-                intArrayOf(0xFFFCEAF0.toInt(), 0xFFF2D5E2.toInt())
-            packageName.contains("browser") || packageName.contains("chrome") ->
-                intArrayOf(0xFFE8F2FB.toInt(), 0xFFD3E3F5.toInt())
-            packageName.contains("setting") ->
-                intArrayOf(0xFFEDEFF4.toInt(), 0xFFDADDE6.toInt())
-            packageName.contains("music") || packageName.contains("spotify") ->
-                intArrayOf(0xFFE9F3E9.toInt(), 0xFFD5E8D7.toInt())
-            else -> intArrayOf(0xFFF1F1F6.toInt(), 0xFFDADDE8.toInt())
-        }
-        return GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            colors
-        ).apply {
-            cornerRadius = dp(19).toFloat()
-            setStroke(dp(1), 0x66FFFFFF)
-        }
     }
 
     private fun selectPinnedApps(): List<LauncherApp> {
