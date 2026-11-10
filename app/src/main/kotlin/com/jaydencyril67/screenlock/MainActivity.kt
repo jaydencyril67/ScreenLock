@@ -204,6 +204,18 @@ class MainActivity : Activity() {
             false
         ))
 
+        val edgeShapeButton = actionButton(
+            "CUSTOM EDGE LIGHTING SHAPE",
+            0xFF27354A.toInt()
+        )
+        edgeShapeButton.setOnClickListener {
+            startActivity(Intent(this, EdgeLightingEditorActivity::class.java))
+        }
+        root.addView(
+            edgeShapeButton,
+            buttonParams().apply { topMargin = dp(16) }
+        )
+
         protectionButton = actionButton("ACTIVATE PHANTOM LOCK", 0xFF526ED6.toInt())
         protectionButton.setOnClickListener { toggleProtection() }
         val protectParams = buttonParams().apply { topMargin = dp(18) }
