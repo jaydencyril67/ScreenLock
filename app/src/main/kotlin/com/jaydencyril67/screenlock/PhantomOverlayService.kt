@@ -11,7 +11,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.IBinder
-import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 
@@ -23,7 +22,6 @@ class PhantomOverlayService : Service() {
         const val ACTION_CLOSE_LOCK = "com.jaydencyril67.screenlock.action.CLOSE_LOCK"
         const val ACTION_RESTORE_LOCK = "com.jaydencyril67.screenlock.action.RESTORE_LOCK"
         const val ACTION_AOD_MODE_CHANGED = "com.jaydencyril67.screenlock.action.AOD_MODE_CHANGED"
-        const val ACTION_AOD_EXIT = "com.jaydencyril67.screenlock.action.AOD_EXIT"
         const val PREFS = "phantom_lock_settings"
         const val PREF_ENABLED = "protection_enabled"
         const val PREF_AOD_MODE = "aod_mode"
@@ -36,37 +34,32 @@ class PhantomOverlayService : Service() {
     }
 
     private var screenReceiverRegistered = false
-    private var dimAodWakeLock: PowerManager.WakeLock? = null
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_SCREEN_OFF -> {
                     if (isProtectionEnabled()) {
-                        // The lock Activity is already running and listens for SCREEN_OFF.
-                        // Switch its existing window to AOD there; Android 11 may block
-                        // starting a new Activity from this background broadcast.
-                        Log.d(TAG, "Screen off: switching existing lock Activity to AOD")
-                        if (isDimAodSelected()) {
-                            // SCREEN_DIM_WAKE_LOCK keeps the LCD lit at low brightness.
-                            // Re-acquiring after a physical power-button press wakes it again.
-                            acquireDimAodWakeLock(forceWake = true)
+                        if (PhantomLockActivity.isAodVisible) {
+                            // A second power press dismisses the active AOD and lets
+                            // Android keep the panel off. Never wake straight back up.
+                            Log.i(TAG, "Screen off: dismissing active AOD")
+                            sendBroadcast(Intent(ACTION_CLOSE_LOCK).setPackage(packageName))
                         } else {
-                            releaseDimAodWakeLock()
+                            // Start the actual AOD Activity as the device locks.
+                            // Setup requires SYSTEM_ALERT_WINDOW, Android's background
+                            // Activity-launch exemption for this user-enabled feature.
+                            Log.i(TAG, "Screen off: launching AOD Activity")
+                            launchLockScreen(PhantomLockActivity.ACTION_AOD_SHOW)
                         }
                     }
                 }
 
                 Intent.ACTION_SCREEN_ON -> {
-                    if (isProtectionEnabled()) {
-                        if (isDimAodSelected()) {
-                            acquireDimAodWakeLock()
-                        } else {
-                            releaseDimAodWakeLock()
-                        }
-                        // Always bring AOD to the foreground on a real screen wake.
-                        // isAlive only tells us the Activity exists, not that it is visible.
-                        launchLockScreen(PhantomLockActivity.ACTION_AOD_WAKE)
+                    if (isProtectionEnabled() && !PhantomLockActivity.isAlive) {
+                        // The user woke the phone after dismissing AOD.
+                        // Restore the interactive lockscreen, not the AOD surface.
+                        launchLockScreen(PhantomLockActivity.ACTION_WAKE)
                     }
                 }
             }
@@ -102,10 +95,11 @@ class PhantomOverlayService : Service() {
             }
 
             ACTION_AOD_MODE_CHANGED -> {
-                if (!isDimAodSelected()) releaseDimAodWakeLock()
+                // Apply a changed brightness choice immediately when AOD is visible.
+                if (PhantomLockActivity.isAodVisible) {
+                    launchLockScreen(PhantomLockActivity.ACTION_AOD_SHOW)
+                }
             }
-
-            ACTION_AOD_EXIT -> releaseDimAodWakeLock()
         }
 
         if (!isProtectionEnabled()) {
@@ -132,38 +126,6 @@ class PhantomOverlayService : Service() {
     private fun isDimAodSelected(): Boolean =
         getSharedPreferences(PREFS, MODE_PRIVATE)
             .getString(PREF_AOD_MODE, AOD_MODE_WAKE) == AOD_MODE_DIM
-
-    @Suppress("DEPRECATION")
-    private fun acquireDimAodWakeLock(forceWake: Boolean = false) {
-        try {
-            val current = dimAodWakeLock
-            if (current?.isHeld == true) {
-                if (!forceWake) return
-                current.release()
-            }
-
-            val powerManager = getSystemService(POWER_SERVICE) as PowerManager
-            val lock = powerManager.newWakeLock(
-                PowerManager.SCREEN_DIM_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
-                "$TAG:DimAOD"
-            ).apply { setReferenceCounted(false) }
-            lock.acquire()
-            dimAodWakeLock = lock
-            Log.i(TAG, "Dim AOD display wake lock acquired")
-        } catch (error: Exception) {
-            Log.e(TAG, "Unable to keep Dim AOD display awake", error)
-        }
-    }
-
-    private fun releaseDimAodWakeLock() {
-        try {
-            dimAodWakeLock?.let { if (it.isHeld) it.release() }
-        } catch (error: Exception) {
-            Log.w(TAG, "Unable to release Dim AOD wake lock", error)
-        } finally {
-            dimAodWakeLock = null
-        }
-    }
 
     private fun launchLockScreen(action: String) {
         if (!isProtectionEnabled() || !Settings.canDrawOverlays(this)) return
@@ -235,7 +197,6 @@ class PhantomOverlayService : Service() {
     }
 
     private fun disableProtection() {
-        releaseDimAodWakeLock()
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
             .putBoolean(PREF_ENABLED, false)
             .commit()
@@ -246,7 +207,6 @@ class PhantomOverlayService : Service() {
     }
 
     override fun onDestroy() {
-        releaseDimAodWakeLock()
         if (screenReceiverRegistered) {
             try {
                 unregisterReceiver(screenReceiver)
