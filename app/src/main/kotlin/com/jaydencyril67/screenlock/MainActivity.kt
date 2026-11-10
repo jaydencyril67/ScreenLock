@@ -204,6 +204,7 @@ class MainActivity : Activity() {
         aodDimButton = actionButton("DIM AOD  ·  LOW-BRIGHTNESS CLOCK", 0xFF27354A.toInt())
         aodDimButton.setOnClickListener {
             prefs.edit().putString(PhantomOverlayService.PREF_AOD_MODE, PhantomOverlayService.AOD_MODE_DIM).apply()
+            notifyAodModeChanged()
             refreshAodSelection()
             Toast.makeText(this, "Dim AOD selected.", Toast.LENGTH_SHORT).show()
         }
@@ -212,6 +213,7 @@ class MainActivity : Activity() {
         aodWakeButton = actionButton("WAKE AOD  ·  NORMAL SLEEP", 0xFF27354A.toInt())
         aodWakeButton.setOnClickListener {
             prefs.edit().putString(PhantomOverlayService.PREF_AOD_MODE, PhantomOverlayService.AOD_MODE_WAKE).apply()
+            notifyAodModeChanged()
             refreshAodSelection()
             Toast.makeText(this, "Wake AOD selected.", Toast.LENGTH_SHORT).show()
         }
@@ -409,6 +411,18 @@ class MainActivity : Activity() {
             if (enabled) 0xFF563044.toInt() else 0xFF526ED6.toInt(),
             18f
         )
+    }
+
+    private fun notifyAodModeChanged() {
+        if (!prefs.getBoolean(PhantomOverlayService.PREF_ENABLED, false)) return
+        try {
+            startService(
+                Intent(this, PhantomOverlayService::class.java)
+                    .setAction(PhantomOverlayService.ACTION_AOD_MODE_CHANGED)
+            )
+        } catch (_: Exception) {
+            // The selected mode is saved; the service will apply it on the next screen cycle.
+        }
     }
 
     private fun refreshAodSelection() {
