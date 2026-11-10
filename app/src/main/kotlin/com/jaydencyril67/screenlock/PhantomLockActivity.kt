@@ -545,13 +545,13 @@ class PhantomLockActivity : Activity() {
         )
         mediaMainRow.addView(
             mediaTextColumn,
-            LinearLayout.LayoutParams(0, dp(58), 1f)
+            LinearLayout.LayoutParams(0, dp(70), 1f)
         )
         mediaContainer.addView(
             mediaMainRow,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(68)
+                dp(80)
             ).apply { topMargin = dp(5) }
         )
 
@@ -577,7 +577,7 @@ class PhantomLockActivity : Activity() {
             mediaControls,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                dp(42)
+                dp(54)
             )
         )
 
