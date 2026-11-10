@@ -329,15 +329,21 @@ class PhantomLockActivity : Activity() {
 
         mediaContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = null
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(18).toFloat()
+                setColor(0xA9101218.toInt())
+                setStroke(dp(1), 0x35FFFFFF)
+            }
             visibility = View.GONE
-            setPadding(0, dp(13), 0, 0)
+            setPadding(dp(14), dp(12), dp(14), dp(11))
+            clipToOutline = true
         }
         val mediaHeading = TextView(this).apply {
-            text = "LOCAL MUSIC"
-            textSize = 9f
-            letterSpacing = 0.2f
-            setTextColor(0xAFC7BEB0.toInt())
+            text = "NOW PLAYING"
+            textSize = 8f
+            letterSpacing = 0.19f
+            setTextColor(0xB8D8C9B7.toInt())
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             includeFontPadding = false
         }
@@ -355,19 +361,24 @@ class PhantomLockActivity : Activity() {
         }
         mediaArtwork = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
-            setBackgroundColor(0x332F3540)
+            background = GradientDrawable().apply {
+                cornerRadius = dp(12).toFloat()
+                setColor(0xFF20232B.toInt())
+            }
+            clipToOutline = true
+            contentDescription = "Album artwork"
         }
         mediaMainRow.addView(
             mediaArtwork,
-            LinearLayout.LayoutParams(dp(58), dp(58)).apply { marginEnd = dp(13) }
+            LinearLayout.LayoutParams(dp(64), dp(64)).apply { marginEnd = dp(13) }
         )
         val mediaTextColumn = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
         }
         mediaTitle = TextView(this).apply {
-            textSize = 15f
-            setTextColor(0xFFF3EFE8.toInt())
+            textSize = 14f
+            setTextColor(0xFFF5F1EA.toInt())
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             includeFontPadding = false
             maxLines = 1
@@ -403,14 +414,14 @@ class PhantomLockActivity : Activity() {
             mediaMainRow,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(62)
-            )
+                dp(68)
+            ).apply { topMargin = dp(5) }
         )
 
         val mediaControls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.START or Gravity.CENTER_VERTICAL
-            setPadding(0, dp(4), 0, 0)
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(7), 0, 0)
         }
         mediaPrevious = mediaControl("‹", "Previous track") {
             sendMusicCommand(LocalMusicPlaybackService.ACTION_PREVIOUS)
@@ -421,9 +432,10 @@ class PhantomLockActivity : Activity() {
         mediaNext = mediaControl("›", "Next track") {
             sendMusicCommand(LocalMusicPlaybackService.ACTION_NEXT)
         }
-        mediaControls.addView(mediaPrevious, LinearLayout.LayoutParams(dp(48), dp(38)))
-        mediaControls.addView(mediaPlayPause, LinearLayout.LayoutParams(dp(48), dp(38)))
-        mediaControls.addView(mediaNext, LinearLayout.LayoutParams(dp(48), dp(38)))
+        mediaControls.addView(mediaPrevious, LinearLayout.LayoutParams(dp(42), dp(40)))
+        mediaControls.addView(mediaPlayPause, LinearLayout.LayoutParams(dp(46), dp(40)))
+        mediaControls.addView(mediaNext, LinearLayout.LayoutParams(dp(42), dp(40)))
+        mediaControls.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         mediaContainer.addView(
             mediaControls,
             LinearLayout.LayoutParams(
@@ -433,13 +445,14 @@ class PhantomLockActivity : Activity() {
         )
 
         mediaChoose = TextView(this).apply {
-            text = "CHOOSE MUSIC FROM PHONE"
-            textSize = 9f
-            letterSpacing = 0.16f
-            setTextColor(0xFFE0BE91.toInt())
+            text = "CHANGE MUSIC"
+            textSize = 8f
+            letterSpacing = 0.12f
+            setTextColor(0xFFE4C49A.toInt())
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             includeFontPadding = false
-            setPadding(0, dp(8), 0, dp(2))
+            setPadding(dp(10), dp(9), 0, dp(9))
+            gravity = Gravity.CENTER_VERTICAL or Gravity.END
             isClickable = true
             isFocusable = true
             contentDescription = "Choose local music files"
@@ -609,12 +622,18 @@ class PhantomLockActivity : Activity() {
         action: () -> Unit
     ): TextView = TextView(this).apply {
         text = glyph
-        textSize = 27f
-        setTextColor(0xFFECE5DA.toInt())
-        typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+        val isMain = description == "Play or pause"
+        textSize = if (isMain) 17f else 23f
+        setTextColor(if (isMain) 0xFF10131A.toInt() else 0xFFECE5DA.toInt())
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         gravity = Gravity.CENTER
         includeFontPadding = false
         contentDescription = description
+        background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(if (isMain) 0xFFE8D3B4.toInt() else 0x1FFFFFFF)
+            if (!isMain) setStroke(dp(1), 0x24FFFFFF)
+        }
         isClickable = true
         isFocusable = true
         setOnClickListener { action() }
