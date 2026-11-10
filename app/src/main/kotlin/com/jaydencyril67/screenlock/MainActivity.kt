@@ -44,6 +44,8 @@ class MainActivity : Activity() {
     private lateinit var protectionButton: Button
     private lateinit var wallpaperStatus: TextView
     private lateinit var resetWallpaperButton: Button
+    private lateinit var aodDimButton: Button
+    private lateinit var aodWakeButton: Button
 
     private val prefs by lazy {
         getSharedPreferences(PhantomOverlayService.PREFS, MODE_PRIVATE)
@@ -182,6 +184,38 @@ class MainActivity : Activity() {
             resetWallpaperButton,
             buttonParams().apply { topMargin = dp(10) }
         )
+
+        val aodSection = label(
+            "ALWAYS-ON DISPLAY",
+            10f,
+            0xFF8296BC.toInt(),
+            true
+        ).apply {
+            letterSpacing = 0.18f
+            setPadding(0, dp(28), 0, dp(8))
+        }
+        root.addView(aodSection)
+        root.addView(label(
+            "Choose how Phantom presents its clock when you wake the phone. Dim AOD keeps the clock faintly visible and holds the display awake; Wake AOD lets the screen sleep normally.",
+            12f,
+            0xFFAAB6CE.toInt(),
+            false
+        ))
+        aodDimButton = actionButton("DIM AOD  ·  LOW-BRIGHTNESS CLOCK", 0xFF27354A.toInt())
+        aodDimButton.setOnClickListener {
+            prefs.edit().putString(PhantomOverlayService.PREF_AOD_MODE, PhantomOverlayService.AOD_MODE_DIM).apply()
+            refreshAodSelection()
+            Toast.makeText(this, "Dim AOD selected.", Toast.LENGTH_SHORT).show()
+        }
+        root.addView(aodDimButton, buttonParams().apply { topMargin = dp(12) })
+
+        aodWakeButton = actionButton("WAKE AOD  ·  NORMAL SLEEP", 0xFF27354A.toInt())
+        aodWakeButton.setOnClickListener {
+            prefs.edit().putString(PhantomOverlayService.PREF_AOD_MODE, PhantomOverlayService.AOD_MODE_WAKE).apply()
+            refreshAodSelection()
+            Toast.makeText(this, "Wake AOD selected.", Toast.LENGTH_SHORT).show()
+        }
+        root.addView(aodWakeButton, buttonParams().apply { topMargin = dp(8) })
 
         protectionButton = actionButton("ACTIVATE PHANTOM LOCK", 0xFF526ED6.toInt())
         protectionButton.setOnClickListener { toggleProtection() }
@@ -331,6 +365,7 @@ class MainActivity : Activity() {
 
     private fun refreshDashboard() {
         refreshWallpaperStatus()
+        refreshAodSelection()
         val overlayGranted = Settings.canDrawOverlays(this)
         val cameraGranted = checkSelfPermission(android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED
         val enabled = prefs.getBoolean(PhantomOverlayService.PREF_ENABLED, false)
@@ -372,6 +407,22 @@ class MainActivity : Activity() {
         }
         protectionButton.background = rounded(
             if (enabled) 0xFF563044.toInt() else 0xFF526ED6.toInt(),
+            18f
+        )
+    }
+
+    private fun refreshAodSelection() {
+        if (!::aodDimButton.isInitialized || !::aodWakeButton.isInitialized) return
+        val selected = prefs.getString(
+            PhantomOverlayService.PREF_AOD_MODE,
+            PhantomOverlayService.AOD_MODE_WAKE
+        )
+        aodDimButton.background = rounded(
+            if (selected == PhantomOverlayService.AOD_MODE_DIM) 0xFF526ED6.toInt() else 0xFF27354A.toInt(),
+            18f
+        )
+        aodWakeButton.background = rounded(
+            if (selected == PhantomOverlayService.AOD_MODE_WAKE) 0xFF526ED6.toInt() else 0xFF27354A.toInt(),
             18f
         )
     }
