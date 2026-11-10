@@ -19,6 +19,9 @@ jobs:
     name: Validate Android source
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      ONEUI_GH_USERNAME: ${{ secrets.ONEUI_GH_USERNAME }}
+      ONEUI_GH_TOKEN: ${{ secrets.ONEUI_GH_TOKEN }}
 
     steps:
       - name: Check out source
