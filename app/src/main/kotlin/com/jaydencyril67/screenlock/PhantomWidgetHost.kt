@@ -252,10 +252,7 @@ class PhantomWidgetHost(
                 textSize = 13f
                 gravity = Gravity.CENTER_VERTICAL
                 setTextColor(Color.WHITE)
-                typeface = android.graphics.Typeface.create(
-                    "sans-serif",
-                    android.graphics.Typeface.MEDIUM
-                )
+                typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
                 setPadding(dp(8), 0, 0, 0)
             }, LinearLayout.LayoutParams(0, dp(36), 1f))
 
