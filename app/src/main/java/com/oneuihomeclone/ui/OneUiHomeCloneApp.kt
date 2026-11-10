@@ -116,7 +116,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.oneuihomeclone.DefaultLauncherState
 import com.oneuihomeclone.LauncherApp
 import com.jaydencyril67.screenlock.R
-import com.oneuihomeclone.BuildConfig
+import com.jaydencyril67.screenlock.BuildConfig
 import com.oneuihomeclone.contacts.FinderContactSearchState
 import com.oneuihomeclone.contacts.FinderContactsRepository
 import com.oneuihomeclone.data.BoundWidget
