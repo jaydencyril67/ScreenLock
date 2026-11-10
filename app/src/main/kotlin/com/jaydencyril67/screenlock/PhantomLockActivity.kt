@@ -197,8 +197,7 @@ class PhantomLockActivity : Activity() {
         } else {
             @Suppress("DEPRECATION")
             window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
-            @Suppress("DEPRECATION")            if (prepareOnly || homeRestore) {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
+            @Suppress("DEPRECATION")            if (prepareOnly || homeRestore) {                window.clearFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
             } else {
                 window.addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
             }
@@ -397,8 +396,7 @@ class PhantomLockActivity : Activity() {
             0xFFB9B0A3.toInt()
             setPadding(0, dp(9), 0, 0)
         }
-        aodSensorStack.addView(
-            fingerprintHint,            LinearLayout.LayoutParams(
+        aodSensorStack.addView(            fingerprintHint,            LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 dp(27)
             )
@@ -410,24 +408,6 @@ class PhantomLockActivity : Activity() {
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
             ).apply { bottomMargin = dp(92) }
-        )
-
-        val hint = TextView(this).apply {
-            text = "TOUCH TO OPEN"
-            textSize = 8f
-            letterSpacing = 0.2f
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            0xFF777168.toInt()
-        }
-        root.addView(
-            hint,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(24),
-                Gravity.BOTTOM
-            ).apply { bottomMargin = dp(18) }
         )
 
         setContentView(root)
@@ -597,8 +577,7 @@ class PhantomLockActivity : Activity() {
             scaleType = ImageView.ScaleType.CENTER_CROP
             background = GradientDrawable().apply {
                 cornerRadius = dp(16).toFloat()
-                setColor(0xFF242A35.toInt())            }
-            clipToOutline = true
+                setColor(0xFF242A35.toInt())            }            clipToOutline = true
             contentDescription = "Album artwork"
         }
         mediaMainRow.addView(
@@ -797,8 +776,7 @@ class PhantomLockActivity : Activity() {
             textSize = 9f
             letterSpacing = 0.19f
             setTextColor(0xC9E3DCD1.toInt())            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            gravity = Gravity.CENTER
-            includeFontPadding = false
+            gravity = Gravity.CENTER            includeFontPadding = false
             setPadding(0, dp(13), 0, 0)
         }
         sensorStack.addView(
@@ -997,8 +975,7 @@ class PhantomLockActivity : Activity() {
 
         val uris = selected.distinct()        if (uris.isEmpty()) return
 
-        uris.forEach { uri ->
-            try {
+        uris.forEach { uri ->            try {
                 contentResolver.takePersistableUriPermission(
                     uri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -1197,7 +1174,6 @@ class PhantomLockActivity : Activity() {
     }
     private fun onFingerprintPressed() {
         if (authenticating || unlockPending) return
-
         if (!armed) {
             showMismatch()
             return
@@ -1397,8 +1373,7 @@ class PhantomLockActivity : Activity() {
 
         try {
             startService(Intent(this, PhantomOverlayService::class.java).apply {
-                action = PhantomOverlayService.ACTION_RESTORE_LOCK
-            })
+                action = PhantomOverlayService.ACTION_RESTORE_LOCK            })
         } catch (_: Exception) {
             // The service may have been stopped while protection was being disabled.
         }
