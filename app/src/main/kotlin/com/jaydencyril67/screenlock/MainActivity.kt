@@ -53,7 +53,7 @@ class MainActivity : Activity() {
         window.statusBarColor = Color.rgb(5, 7, 15)
         window.navigationBarColor = Color.rgb(5, 7, 15)
         window.decorView.systemUiVisibility = 0
-        // Keep the single supported AOD mode and clear settings from the removed edge-light feature.
+        // Keep the single supported AOD mode and clear obsolete custom-outline preferences.
         prefs.edit()
             .putString(PhantomOverlayService.PREF_AOD_MODE, PhantomOverlayService.AOD_MODE_WAKE)
             .remove("edge_lighting_custom_outline")
