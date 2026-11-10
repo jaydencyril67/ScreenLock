@@ -59,7 +59,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -92,6 +91,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.math.roundToInt
 
 
@@ -165,7 +165,7 @@ internal fun rememberStatusClock(): StatusClock {
         }
     }
 
-    val locale = LocalLocale.current.platformLocale
+    val locale = Locale.getDefault()
     return remember(now, locale) {
         StatusClock(
             timeText = now.format(DateTimeFormatter.ofPattern("h:mm", locale)),
