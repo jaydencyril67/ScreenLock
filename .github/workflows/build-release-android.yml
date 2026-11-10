@@ -24,6 +24,9 @@ jobs:
     name: Build and publish signed production APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      ONEUI_GH_USERNAME: ${{ secrets.ONEUI_GH_USERNAME }}
+      ONEUI_GH_TOKEN: ${{ secrets.ONEUI_GH_TOKEN }}
 
     steps:
       - name: Check out Phantom Lock
