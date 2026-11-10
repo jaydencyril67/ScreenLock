@@ -1124,32 +1124,19 @@ class PhantomLockActivity : Activity() {
             return
         }
 
-        // onUserLeaveHint runs while this Activity is still visible. Bring the
-        // existing singleTask lockscreen task forward now, before Android moves
-        // it behind the launcher. A service-launched Activity can be blocked by
-        // Android 11 background-start restrictions, so use the Activity itself
-        // for the primary recovery attempt.
+        // Let the already-running foreground protection service restore the
+        // existing singleTask lock Activity. Launching the Activity directly
+        // from onUserLeaveHint races Android's transition to the launcher and
+        // can silently leave Phantom behind Home on Android 11 / Samsung One UI.
         if (!getSharedPreferences(PhantomOverlayService.PREFS, MODE_PRIVATE)
                 .getBoolean(PhantomOverlayService.PREF_ENABLED, false)) return
 
         try {
-            startActivity(Intent(this, PhantomLockActivity::class.java).apply {
-                action = ACTION_HOME_RESTORE
-                addFlags(
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                        Intent.FLAG_ACTIVITY_NO_ANIMATION
-                )
+            startService(Intent(this, PhantomOverlayService::class.java).apply {
+                action = PhantomOverlayService.ACTION_RESTORE_LOCK
             })
         } catch (_: Exception) {
-            // If Android rejects the direct attempt, retain the foreground-service fallback.
-            try {
-                startService(Intent(this, PhantomOverlayService::class.java).apply {
-                    action = PhantomOverlayService.ACTION_RESTORE_LOCK
-                })
-            } catch (_: Exception) {
-                // Protection may have been disabled while navigation was occurring.
-            }
+            // The service may have been stopped while protection was being disabled.
         }
     }
 
