@@ -20,8 +20,6 @@ import android.os.Bundle
 import android.os.CancellationSignal
 import android.os.Handler
 import android.os.Looper
-import android.os.PowerManager
-import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -80,7 +78,6 @@ class PhantomLockActivity : Activity() {
     private var fingerprintView: ImageView? = null
     private var externalShortcutLaunched = false
     private var externalNavigationInProgress = false
-    private var lastNavigationRestoreAt = 0L
     private var flashEnabled = false
     private var flashCameraId: String? = null
     private var pendingCameraAction = CAMERA_ACTION_NONE
@@ -1154,53 +1151,19 @@ class PhantomLockActivity : Activity() {
     }
 
     override fun onPause() {
-        // HOME/Recents and navigation transitions do not always produce an
-        // identical callback sequence on Samsung's Android 11 build. Keep a
-        // lifecycle fallback, while excluding permission prompts, the camera,
-        // the music picker, biometric UI and display-off transitions.
-        if (!externalNavigationInProgress &&
-            !externalShortcutLaunched &&
-            !authenticating &&
-            pendingCameraAction == CAMERA_ACTION_NONE &&
-            !isFinishing &&
-            !isDestroyed
-        ) {
-            requestNavigationRestore()
-        }
+        // Navigation away from this legacy Activity must never recreate the lock.
+        // PhantomOverlayService owns the persistent lock surface and restores it
+        // only after display wake or an approved shortcut returns.
         super.onPause()
     }
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (isFinishing || isDestroyed) return
         if (externalShortcutLaunched) {
             externalShortcutLaunched = false
             externalNavigationInProgress = true
-            return
         }
-        requestNavigationRestore()
-    }
-
-    private fun requestNavigationRestore() {
-        val powerManager = getSystemService(POWER_SERVICE) as? PowerManager
-        if (powerManager?.isInteractive != true) return
-
-        if (!getSharedPreferences(PhantomOverlayService.PREFS, MODE_PRIVATE)
-                .getBoolean(PhantomOverlayService.PREF_ENABLED, false)) return
-
-        // onUserLeaveHint() and onPause() can both fire for one navigation
-        // action. Debounce them so the service receives one restore request.
-        val now = SystemClock.elapsedRealtime()
-        if (now - lastNavigationRestoreAt < 750L) return
-        lastNavigationRestoreAt = now
-
-        try {
-            startService(Intent(this, PhantomOverlayService::class.java).apply {
-                action = PhantomOverlayService.ACTION_RESTORE_LOCK
-            })
-        } catch (_: Exception) {
-            // The service may have been stopped while protection was being disabled.
-        }
+        // In particular, HOME and Recents are not unlock or lock-restore events.
     }
 
     private fun dp(value: Int): Int =
