@@ -703,7 +703,7 @@ class PhantomHomeActivity : Activity() {
             }
             flipper.addView(
                 empty,
-                ViewFlipper.LayoutParams(
+                FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
@@ -713,7 +713,7 @@ class PhantomHomeActivity : Activity() {
                 val pageApps = apps.drop(pageIndex * 20).take(20)
                 flipper.addView(
                     createDrawerPage(pageApps),
-                    ViewFlipper.LayoutParams(
+                    FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
