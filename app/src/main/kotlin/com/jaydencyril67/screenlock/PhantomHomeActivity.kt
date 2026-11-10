@@ -52,6 +52,8 @@ class PhantomHomeActivity : Activity() {
     private lateinit var clockLabel: TextView
     private lateinit var dateLabel: TextView
     private lateinit var gestureDetector: GestureDetector
+    private lateinit var widgetContainer: LinearLayout
+    private lateinit var widgetHost: PhantomWidgetHost
 
     private var launchableApps: List<LauncherApp> = emptyList()
     private var drawerOverlay: FrameLayout? = null
@@ -104,10 +106,16 @@ class PhantomHomeActivity : Activity() {
         buildHome()
     }
 
+    override fun onStart() {
+        super.onStart()
+        if (::widgetHost.isInitialized) widgetHost.startListening()
+    }
+
     override fun onResume() {
         super.onResume()
         launchableApps = queryLaunchableApps()
         updateClock()
+        if (::widgetHost.isInitialized) widgetHost.render()
         handler.removeCallbacks(clockTick)
         handler.post(clockTick)
     }
@@ -115,6 +123,19 @@ class PhantomHomeActivity : Activity() {
     override fun onPause() {
         handler.removeCallbacks(clockTick)
         super.onPause()
+    }
+
+    override fun onStop() {
+        if (::widgetHost.isInitialized) widgetHost.stopListening()
+        super.onStop()
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (::widgetHost.isInitialized) {
+            widgetHost.onActivityResult(requestCode, resultCode, data)
+        }
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
@@ -136,9 +157,24 @@ class PhantomHomeActivity : Activity() {
             )
         )
 
+        // A restrained scrim preserves wallpaper detail while keeping One UI-like
+        // glass surfaces and labels readable on both bright and dark wallpapers.
+        root.addView(
+            View(this).apply {
+                background = GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(0x4A05070D, 0x1205070D, 0x7205070D)
+                )
+            },
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(24), dp(56), dp(24), dp(24))
+            setPadding(dp(22), dp(48), dp(22), dp(18))
         }
         root.addView(
             content,
@@ -157,13 +193,14 @@ class PhantomHomeActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        clockLabel = text("09:41", 48f, Color.WHITE, false).apply {
+        clockLabel = text("09:41", 49f, Color.WHITE, false).apply {
             includeFontPadding = false
-            letterSpacing = -0.04f
+            letterSpacing = -0.035f
+            setShadowLayer(dp(10).toFloat(), 0f, dp(2).toFloat(), 0x55000000)
         }
-        dateLabel = text("", 13f, 0xE5FFFFFF.toInt(), false).apply {
-            setPadding(1, dp(3), 0, 0)
-            letterSpacing = 0.02f
+        dateLabel = text("", 13f, 0xEFFFFFFF.toInt(), false).apply {
+            setPadding(dp(2), dp(3), 0, 0)
+            letterSpacing = 0.015f
         }
         clockBlock.addView(clockLabel)
         clockBlock.addView(dateLabel)
@@ -172,9 +209,9 @@ class PhantomHomeActivity : Activity() {
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         )
 
-        val settingsButton = text("⚙", 25f, Color.WHITE, false).apply {
+        val settingsButton = text("⚙", 24f, Color.WHITE, false).apply {
             gravity = Gravity.CENTER
-            background = glassSurface(0x38FFFFFF, 0x38FFFFFF, 24f)
+            background = glassSurface(0x36FFFFFF, 0x50FFFFFF, 23f)
             contentDescription = "Open Phantom settings"
             isClickable = true
             isFocusable = true
@@ -184,38 +221,87 @@ class PhantomHomeActivity : Activity() {
         }
         header.addView(
             settingsButton,
-            LinearLayout.LayoutParams(dp(48), dp(48))
+            LinearLayout.LayoutParams(dp(49), dp(49))
         )
         content.addView(header)
+
+        val widgetHeading = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        widgetHeading.addView(
+            text("WIDGETS", 10f, 0xDFFFFFFF.toInt(), true).apply {
+                letterSpacing = 0.16f
+            },
+            LinearLayout.LayoutParams(0, dp(34), 1f)
+        )
+        val addWidgetButton = text("+  ADD", 10f, Color.WHITE, true).apply {
+            gravity = Gravity.CENTER
+            letterSpacing = 0.08f
+            setPadding(dp(13), 0, dp(13), 0)
+            background = glassSurface(0x36FFFFFF, 0x48FFFFFF, 18f)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { widgetHost.addWidget() }
+        }
+        widgetHeading.addView(
+            addWidgetButton,
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(34))
+        )
+        content.addView(
+            widgetHeading,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(34)
+            ).apply { topMargin = dp(15) }
+        )
+
+        widgetContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        content.addView(
+            widgetContainer,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(5) }
+        )
+        widgetHost = PhantomWidgetHost(this, widgetContainer)
 
         val search = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(17), 0, dp(17), 0)
-            background = glassSurface(0x32FFFFFF, 0x46FFFFFF, 24f)
+            setPadding(dp(17), 0, dp(14), 0)
+            background = glassSurface(0xDDF7F7FA.toInt(), 0xAFFFFFFF.toInt(), 26f)
             isClickable = true
             isFocusable = true
-            setOnClickListener { openWebSearch() }
+            setOnClickListener { openAppDrawer(focusSearch = true) }
         }
         search.addView(
-            text("⌕", 27f, 0xEFFFFFFF.toInt(), false).apply {
+            text("⌕", 27f, 0xFF343744.toInt(), false).apply {
                 gravity = Gravity.CENTER
             },
-            LinearLayout.LayoutParams(dp(32), dp(52))
+            LinearLayout.LayoutParams(dp(32), dp(50))
         )
         search.addView(
-            text("Search apps or the web", 14f, 0xD8FFFFFF.toInt(), false).apply {
+            text("Search apps", 14f, 0xFF515563.toInt(), false).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(7), 0, 0, 0)
             },
-            LinearLayout.LayoutParams(0, dp(52), 1f)
+            LinearLayout.LayoutParams(0, dp(50), 1f)
+        )
+        search.addView(
+            text("⋮", 22f, 0xFF4B5060.toInt(), false).apply {
+                gravity = Gravity.CENTER
+            },
+            LinearLayout.LayoutParams(dp(25), dp(50))
         )
         content.addView(
             search,
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(54)
-            ).apply { topMargin = dp(28) }
+                dp(52)
+            ).apply { topMargin = dp(15) }
         )
 
         val spacer = View(this)
@@ -228,9 +314,9 @@ class PhantomHomeActivity : Activity() {
             )
         )
 
-        val appHeading = text("FAVOURITES", 10f, 0xBFFFFFFF.toInt(), true).apply {
-            letterSpacing = 0.18f
-            setPadding(dp(2), 0, 0, dp(13))
+        val appHeading = text("FAVOURITES", 10f, 0xDFFFFFFF.toInt(), true).apply {
+            letterSpacing = 0.16f
+            setPadding(dp(2), 0, 0, dp(9))
         }
         content.addView(appHeading)
 
@@ -241,10 +327,10 @@ class PhantomHomeActivity : Activity() {
 
         addAppRows(content, homeApps, 4)
 
-        val drawerHint = text("SWIPE UP OR TAP TO SEE ALL APPS", 9f, 0xAFFFFFFF.toInt(), true).apply {
+        val drawerHint = text("SWIPE UP FOR ALL APPS", 9f, 0xBFFFFFFF.toInt(), true).apply {
             gravity = Gravity.CENTER
-            letterSpacing = 0.12f
-            setPadding(0, dp(8), 0, dp(11))
+            letterSpacing = 0.13f
+            setPadding(0, dp(2), 0, dp(9))
             isClickable = true
             setOnClickListener { openAppDrawer() }
         }
@@ -253,21 +339,21 @@ class PhantomHomeActivity : Activity() {
         val dock = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(dp(7), dp(8), dp(7), dp(8))
-            background = glassSurface(0x38FFFFFF, 0x50FFFFFF, 28f)
+            setPadding(dp(7), dp(6), dp(7), dp(6))
+            background = glassSurface(0x3DFFFFFF, 0x50FFFFFF, 27f)
         }
         pinnedApps.take(4).forEach { app ->
             dock.addView(
                 createAppTile(app, showLabel = false),
-                LinearLayout.LayoutParams(0, dp(66), 1f)
+                LinearLayout.LayoutParams(0, dp(70), 1f)
             )
         }
         content.addView(
             dock,
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(82)
-            ).apply { topMargin = dp(3) }
+                dp(80)
+            ).apply { topMargin = dp(1) }
         )
 
         setContentView(root)
@@ -312,17 +398,22 @@ class PhantomHomeActivity : Activity() {
             setOnClickListener { launchApp(app) }
         }
 
+        // One UI-inspired squircle icon plate: a consistent surface and larger
+        // icon area, without replacing the identity of the app's own logo.
         val iconFrame = FrameLayout(this).apply {
-            background = glassSurface(0x29FFFFFF, 0x25FFFFFF, 19f)
+            background = appIconSurface(app)
+            clipToOutline = true
+            elevation = dp(2).toFloat()
         }
         val icon = ImageView(this).apply {
             setImageDrawable(app.icon)
             scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = app.label
+            setPadding(dp(3), dp(3), dp(3), dp(3))
         }
         iconFrame.addView(
             icon,
-            FrameLayout.LayoutParams(dp(43), dp(43), Gravity.CENTER)
+            FrameLayout.LayoutParams(dp(54), dp(54), Gravity.CENTER)
         )
         tile.addView(
             iconFrame,
@@ -333,19 +424,48 @@ class PhantomHomeActivity : Activity() {
 
         if (showLabel) {
             tile.addView(
-                text(app.label, 10f, Color.WHITE, false).apply {
+                text(app.label, 10.5f, Color.WHITE, false).apply {
                     gravity = Gravity.CENTER
                     maxLines = 1
                     ellipsize = android.text.TextUtils.TruncateAt.END
                     setPadding(dp(2), dp(5), dp(2), 0)
+                    shadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
                 },
                 LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                    dp(23)
+                    dp(24)
                 )
             )
         }
         return tile
+    }
+
+    private fun appIconSurface(app: LauncherApp): GradientDrawable {
+        val packageName = app.packageName.lowercase(Locale.ROOT)
+        val colors = when {
+            packageName.contains("dialer") || packageName.contains("phone") ->
+                intArrayOf(0xFFE5F5ED.toInt(), 0xFFC8EBDD.toInt())
+            packageName.contains("messag") || packageName.contains("sms") ->
+                intArrayOf(0xFFE9F2FF.toInt(), 0xFFD4E2FA.toInt())
+            packageName.contains("camera") ->
+                intArrayOf(0xFFF2F0EC.toInt(), 0xFFDAD7D1.toInt())
+            packageName.contains("gallery") || packageName.contains("photo") ->
+                intArrayOf(0xFFFCEAF0.toInt(), 0xFFF2D5E2.toInt())
+            packageName.contains("browser") || packageName.contains("chrome") ->
+                intArrayOf(0xFFE8F2FB.toInt(), 0xFFD3E3F5.toInt())
+            packageName.contains("setting") ->
+                intArrayOf(0xFFEDEFF4.toInt(), 0xFFDADDE6.toInt())
+            packageName.contains("music") || packageName.contains("spotify") ->
+                intArrayOf(0xFFE9F3E9.toInt(), 0xFFD5E8D7.toInt())
+            else -> intArrayOf(0xFFF1F1F6.toInt(), 0xFFDADDE8.toInt())
+        }
+        return GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            colors
+        ).apply {
+            cornerRadius = dp(19).toFloat()
+            setStroke(dp(1), 0x66FFFFFF)
+        }
     }
 
     private fun selectPinnedApps(): List<LauncherApp> {
@@ -406,7 +526,7 @@ class PhantomHomeActivity : Activity() {
         }
     }
 
-    private fun openAppDrawer() {
+    private fun openAppDrawer(focusSearch: Boolean = false) {
         if (drawerOverlay != null) return
 
         val overlay = FrameLayout(this).apply {
@@ -542,6 +662,13 @@ class PhantomHomeActivity : Activity() {
             .setDuration(190L)
             .start()
         PhantomTypography.apply(panel, this)
+        if (focusSearch) {
+            search.requestFocus()
+            search.post {
+                val inputMethod = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                inputMethod.showSoftInput(search, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+            }
+        }
     }
 
     private fun renderDrawerApps(
