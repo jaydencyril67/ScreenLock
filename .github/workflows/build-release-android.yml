@@ -210,13 +210,13 @@ jobs:
           version_code = os.environ["APP_VERSION_CODE"]
 
           source, code_count = re.subn(
-              r"(?m)^(\\s*)versionCode\\s*=\\s*[0-9]+\\s*$",
+              r"(?m)^(\s*)versionCode\s*=\s*[0-9]+\s*$",
               lambda match: match.group(1) + "versionCode = " + version_code,
               source,
               count=1,
           )
           source, name_count = re.subn(
-              r'(?m)^(\\s*)versionName\\s*=\\s*"[^"]*"\\s*$',
+              r'(?m)^(\s*)versionName\s*=\s*"[^"]*"\s*$',
               lambda match: match.group(1) + 'versionName = "' + version + '"',
               source,
               count=1,
@@ -325,9 +325,9 @@ jobs:
             exit 1
           fi
 
-          gh release create "$tag" PhantomLock.apk \\
-            --target "$GITHUB_SHA" \\
-            --title "Phantom Lock ${APP_VERSION}" \\
+          gh release create "$tag" PhantomLock.apk \
+            --target "$GITHUB_SHA" \
+            --title "Phantom Lock ${APP_VERSION}" \
             --generate-notes
 
       - name: Notify ApiCrownStore about the published APK release
@@ -342,23 +342,23 @@ jobs:
             exit 1
           fi
 
-          oidc_response="$(curl --fail --silent --show-error \\
-            --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \\
-            --header "Accept: application/json" \\
+          oidc_response="$(curl --fail --silent --show-error \
+            --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            --header "Accept: application/json" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https%3A%2F%2Fapicrownstore.kingshall.online")"
           oidc_token="$(printf '%s' "$oidc_response" | jq -er '.value')"
-          payload="$(jq -n \\
-            --arg repository "$GITHUB_REPOSITORY" \\
-            --arg tag "v$APP_VERSION" \\
+          payload="$(jq -n \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg tag "v$APP_VERSION" \
             '{action:"published",repository:{full_name:$repository},release:{tag_name:$tag,draft:false,prerelease:false}}')"
 
           for attempt in 1 2 3 4 5; do
-            if curl --connect-timeout 15 --max-time 40 --fail-with-body --silent --show-error \\
-              --request POST "$API_URL/api/webhooks/github/release" \\
-              --header "Content-Type: application/json" \\
-              --header "X-GitHub-Event: release" \\
-              --header "X-GitHub-Delivery: $GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$GITHUB_JOB" \\
-              --header "Authorization: Bearer $oidc_token" \\
+            if curl --connect-timeout 15 --max-time 40 --fail-with-body --silent --show-error \
+              --request POST "$API_URL/api/webhooks/github/release" \
+              --header "Content-Type: application/json" \
+              --header "X-GitHub-Event: release" \
+              --header "X-GitHub-Delivery: $GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$GITHUB_JOB" \
+              --header "Authorization: Bearer $oidc_token" \
               --data "$payload"; then
               exit 0
             fi
