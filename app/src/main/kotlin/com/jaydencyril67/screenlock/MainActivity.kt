@@ -53,6 +53,7 @@ class MainActivity : Activity() {
         window.navigationBarColor = Color.rgb(5, 7, 15)
         window.decorView.systemUiVisibility = 0
         buildDashboard()
+        PhantomTypography.apply(findViewById(android.R.id.content), this)
         showEntrySplash()
     }
 
@@ -282,6 +283,7 @@ class MainActivity : Activity() {
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
         )
+        PhantomTypography.apply(splash, this)
 
         // Keep the branded entry splash visible for the same 3-second
         // minimum used across the KingsHall app experience.

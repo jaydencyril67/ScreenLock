@@ -598,6 +598,7 @@ class PhantomLockActivity : Activity() {
         )
 
         setContentView(root)
+        PhantomTypography.apply(root, this)
         updateClock()
         refreshDynamicContent()
     }
