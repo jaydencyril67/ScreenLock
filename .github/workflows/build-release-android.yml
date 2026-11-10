@@ -140,9 +140,10 @@ jobs:
           print("Configured Phantom Lock " + version + " (versionCode " + version_code + ")")
           PY
 
-      - name: Prepare the existing permanent release signing key
+      - name: Load the existing production signing key
         env:
           GH_TOKEN: ${{ github.token }}
+          KEYSTORE_BASE64: ${{ secrets.PHANTOM_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.PHANTOM_KEYSTORE_PASSWORD }}
         run: |
           set -euo pipefail
@@ -151,17 +152,26 @@ jobs:
             exit 1
           fi
 
-          mkdir -p signing
-          run_id="$(gh run list --workflow generate-release-keystore.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId')"
-          if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
-            echo "::error::No successful Phantom Lock signing-key generation run was found."
-            echo "::error::Run Generate Phantom Lock Release Keystore before publishing."
-            exit 1
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Using the persistent repository signing-key secret."
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > app/phantom-lock-release.keystore
+          else
+            echo "::warning::PHANTOM_KEYSTORE_BASE64 is not configured; falling back to the saved signing-key artifact."
+            mkdir -p signing
+            run_id="$(gh run list --workflow generate-release-keystore.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId')"
+            if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
+              echo "::error::No successful Phantom Lock signing-key generation run was found."
+              echo "::error::Run Generate Phantom Lock Release Keystore before publishing."
+              exit 1
+            fi
+
+            gh run download "$run_id" --name phantom-lock-release-signing-files --dir signing
+            test -s signing/phantom-lock-release.keystore
+            cp signing/phantom-lock-release.keystore app/phantom-lock-release.keystore
           fi
 
-          gh run download "$run_id" --name phantom-lock-release-signing-files --dir signing
-          test -s signing/phantom-lock-release.keystore
-          cp signing/phantom-lock-release.keystore app/phantom-lock-release.keystore
+          test -s app/phantom-lock-release.keystore
+          chmod 600 app/phantom-lock-release.keystore
           keytool -list -keystore app/phantom-lock-release.keystore -storepass "$KEYSTORE_PASSWORD" -alias phantomlock >/dev/null
 
           {
