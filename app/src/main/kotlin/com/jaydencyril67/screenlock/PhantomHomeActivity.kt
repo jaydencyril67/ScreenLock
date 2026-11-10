@@ -1,5 +1,6 @@
 package com.jaydencyril67.screenlock
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.ResolveInfo
 import android.graphics.Color
@@ -863,6 +864,7 @@ class PhantomHomeActivity : AppCompatActivity() {
         (value * resources.displayMetrics.density).toInt()
 
     @Suppress("DEPRECATION")
+    @SuppressLint("MissingSuperCall")
     override fun onBackPressed() {
         if (drawerOverlay != null) {
             closeAppDrawer()
