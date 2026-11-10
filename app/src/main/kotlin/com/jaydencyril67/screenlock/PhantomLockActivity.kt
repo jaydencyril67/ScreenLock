@@ -48,6 +48,7 @@ class PhantomLockActivity : Activity() {
         private const val CAMERA_ACTION_OPEN_CAMERA = 2
         const val ACTION_PREPARE = "com.jaydencyril67.screenlock.action.PREPARE_LOCK"
         const val ACTION_WAKE = "com.jaydencyril67.screenlock.action.WAKE_LOCK"
+        const val ACTION_HOME_RESTORE = "com.jaydencyril67.screenlock.action.HOME_RESTORE"
 
         @Volatile
         var isAlive: Boolean = false
@@ -170,18 +171,24 @@ class PhantomLockActivity : Activity() {
         super.onNewIntent(intent)
         setIntent(intent)
         val prepareOnly = intent.action == ACTION_PREPARE
+        val homeRestore = intent.action == ACTION_HOME_RESTORE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
-            setTurnScreenOn(!prepareOnly)
+            setTurnScreenOn(!prepareOnly && !homeRestore)
         } else {
             @Suppress("DEPRECATION")
             window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
             @Suppress("DEPRECATION")
-            if (prepareOnly) {
+            if (prepareOnly || homeRestore) {
                 window.clearFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
             } else {
                 window.addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
             }
+        }
+        if (homeRestore) {
+            // Keep the current lockscreen state intact when returning from Home/Recents.
+            applyImmersiveMode()
+            return
         }
         armed = false
         unlockPending = false
@@ -1118,14 +1125,32 @@ class PhantomLockActivity : Activity() {
             return
         }
 
-        // Home and Recents background Activities. Ask the foreground service to
-        // restore Phantom; overlay permission is already required by setup.
+        // onUserLeaveHint runs while this Activity is still visible. Bring the
+        // existing singleTask lockscreen task forward now, before Android moves
+        // it behind the launcher. A service-launched Activity can be blocked by
+        // Android 11 background-start restrictions, so use the Activity itself
+        // for the primary recovery attempt.
+        if (!getSharedPreferences(PhantomOverlayService.PREFS, MODE_PRIVATE)
+                .getBoolean(PhantomOverlayService.PREF_ENABLED, false)) return
+
         try {
-            startService(Intent(this, PhantomOverlayService::class.java).apply {
-                action = PhantomOverlayService.ACTION_RESTORE_LOCK
+            startActivity(Intent(this, PhantomLockActivity::class.java).apply {
+                action = ACTION_HOME_RESTORE
+                addFlags(
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_NO_ANIMATION
+                )
             })
         } catch (_: Exception) {
-            // Protection may have been disabled while navigation was occurring.
+            // If Android rejects the direct attempt, retain the foreground-service fallback.
+            try {
+                startService(Intent(this, PhantomOverlayService::class.java).apply {
+                    action = PhantomOverlayService.ACTION_RESTORE_LOCK
+                })
+            } catch (_: Exception) {
+                // Protection may have been disabled while navigation was occurring.
+            }
         }
     }
 
