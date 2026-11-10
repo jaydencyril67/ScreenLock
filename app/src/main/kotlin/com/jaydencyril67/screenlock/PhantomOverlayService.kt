@@ -11,8 +11,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.IBinder
-import android.os.Handler
-import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 
@@ -32,8 +30,6 @@ class PhantomOverlayService : Service() {
     }
 
     private var screenReceiverRegistered = false
-    private val mainHandler = Handler(Looper.getMainLooper())
-    private var restoreLockRunnable: Runnable? = null
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -81,19 +77,12 @@ class PhantomOverlayService : Service() {
             }
 
             ACTION_RESTORE_LOCK -> {
-                // Home navigation is still transitioning when onUserLeaveHint()
-                // reaches the service. Starting the Activity immediately can lose
-                // the race to the launcher on Android 11 / Samsung One UI.
-                // Defer the restore until the launcher transition has settled.
-                restoreLockRunnable?.let(mainHandler::removeCallbacks)
-                restoreLockRunnable = Runnable {
-                    restoreLockRunnable = null
-                    if (isProtectionEnabled() && Settings.canDrawOverlays(this)) {
-                        Log.i(TAG, "Restoring Phantom after Home transition")
-                        launchLockScreen(PhantomLockActivity.ACTION_HOME_RESTORE)
-                    }
+                // Restore immediately when Home is pressed without completing unlock.
+                // Do not add an app-side delay; Android/Samsung controls the transition.
+                if (isProtectionEnabled() && Settings.canDrawOverlays(this)) {
+                    Log.i(TAG, "Immediately restoring Phantom after Home")
+                    launchLockScreen(PhantomLockActivity.ACTION_HOME_RESTORE)
                 }
-                mainHandler.postDelayed(restoreLockRunnable!!, 500L)
             }
         }
 
@@ -214,8 +203,6 @@ class PhantomOverlayService : Service() {
     }
 
     override fun onDestroy() {
-        restoreLockRunnable?.let(mainHandler::removeCallbacks)
-        restoreLockRunnable = null
         if (screenReceiverRegistered) {
             try {
                 unregisterReceiver(screenReceiver)
