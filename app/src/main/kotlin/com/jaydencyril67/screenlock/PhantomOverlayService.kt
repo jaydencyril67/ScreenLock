@@ -43,8 +43,10 @@ class PhantomOverlayService : Service() {
             when (intent.action) {
                 Intent.ACTION_SCREEN_OFF -> {
                     if (isProtectionEnabled()) {
-                        Log.d(TAG, "Screen off: preparing AOD surface")
-                        prepareLockScreen()
+                        // The lock Activity is already running and listens for SCREEN_OFF.
+                        // Switch its existing window to AOD there; Android 11 may block
+                        // starting a new Activity from this background broadcast.
+                        Log.d(TAG, "Screen off: switching existing lock Activity to AOD")
                         if (isDimAodSelected()) {
                             // SCREEN_DIM_WAKE_LOCK keeps the LCD lit at low brightness.
                             // Re-acquiring after a physical power-button press wakes it again.
@@ -161,20 +163,6 @@ class PhantomOverlayService : Service() {
         } finally {
             dimAodWakeLock = null
         }
-    }
-
-    /**
-     * Start and fully create the lock Activity while the display is non-interactive.
-     * The Activity is showWhenLocked but deliberately does not turn the display on.
-     * This moves Activity creation/layout work out of the screen-on race.
-     */
-    private fun prepareLockScreen() {
-        if (!isProtectionEnabled() || !Settings.canDrawOverlays(this)) return
-
-        // Re-send the prepare action even when the Activity already exists.
-        // This rebuilds its window using the latest saved AOD mode and ensures
-        // the AOD surface is the one presented when Android wakes the display.
-        launchLockScreen(PhantomLockActivity.ACTION_AOD_PREPARE)
     }
 
     private fun launchLockScreen(action: String) {
