@@ -62,6 +62,7 @@
 
         <activity
             android:name=".MainActivity"
+            android:theme="@style/PhantomOneUITheme"
             android:configChanges="keyboardHidden|orientation|screenSize"
             android:exported="true"
             android:screenOrientation="portrait">
