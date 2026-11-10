@@ -350,13 +350,6 @@ class PhantomHomeActivity : Activity() {
                 },
                 LinearLayout.LayoutParams(0, dp(48), 1f)
             )
-            addView(
-                text("●", 12f, 0xFF717784.toInt(), false).apply {
-                    gravity = Gravity.CENTER
-                    contentDescription = "Voice search"
-                },
-                LinearLayout.LayoutParams(dp(26), dp(48))
-            )
         }
     }
 
@@ -533,7 +526,7 @@ class PhantomHomeActivity : Activity() {
         if (drawerOverlay != null) return
 
         val overlay = FrameLayout(this).apply {
-            setBackgroundColor(0xD9090C14.toInt())
+            setBackgroundColor(0x55090C14)
             isClickable = true
             isFocusable = true
         }
