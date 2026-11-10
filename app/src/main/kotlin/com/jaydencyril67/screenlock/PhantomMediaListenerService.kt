@@ -68,11 +68,15 @@ class PhantomMediaListenerService : NotificationListenerService() {
             val mediaUri = metadata.getString(MediaMetadata.METADATA_KEY_MEDIA_URI)
                 ?: controller.metadata?.description?.mediaUri?.toString()
                 ?: metadata.getString(MediaMetadata.METADATA_KEY_MEDIA_ID)
-                ?: return false
+            if (mediaUri.isNullOrBlank()) {
+                // Samsung Music is a device-local library player; it does not
+                // offer online streaming playback, so its session is safe to accept.
+                return controller.packageName == "com.sec.android.app.music"
+            }
             val scheme = try { android.net.Uri.parse(mediaUri).scheme?.lowercase() }
                 catch (_: Exception) { null }
             // Only content:// and file:// sources qualify. Network URLs and
-            // sessions without a verifiable local source are deliberately ignored.
+            // sessions without a verifiable local source are otherwise ignored.
             return scheme == "content" || scheme == "file"
         }
 
