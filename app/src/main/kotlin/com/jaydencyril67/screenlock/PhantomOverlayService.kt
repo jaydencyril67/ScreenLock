@@ -79,7 +79,7 @@ class PhantomOverlayService : Service() {
             ACTION_RESTORE_LOCK -> {
                 if (isProtectionEnabled()) {
                     Log.i(TAG, "Restoring Phantom after system navigation")
-                    launchLockScreen(PhantomLockActivity.ACTION_WAKE)
+                    launchLockScreen(PhantomLockActivity.ACTION_HOME_RESTORE)
                 }
             }
         }
