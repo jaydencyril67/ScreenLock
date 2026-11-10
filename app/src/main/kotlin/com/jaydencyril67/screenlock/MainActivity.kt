@@ -44,9 +44,6 @@ class MainActivity : Activity() {
     private lateinit var protectionButton: Button
     private lateinit var wallpaperStatus: TextView
     private lateinit var resetWallpaperButton: Button
-    private lateinit var aodDimButton: Button
-    private lateinit var aodWakeButton: Button
-
     private val prefs by lazy {
         getSharedPreferences(PhantomOverlayService.PREFS, MODE_PRIVATE)
     }
@@ -56,6 +53,11 @@ class MainActivity : Activity() {
         window.statusBarColor = Color.rgb(5, 7, 15)
         window.navigationBarColor = Color.rgb(5, 7, 15)
         window.decorView.systemUiVisibility = 0
+        // Migrate any previously selected Dim AOD setting to the sole supported mode.
+        prefs.edit().putString(
+            PhantomOverlayService.PREF_AOD_MODE,
+            PhantomOverlayService.AOD_MODE_WAKE
+        ).apply()
         buildDashboard()
         PhantomTypography.apply(findViewById(android.R.id.content), this)
         showEntrySplash()
@@ -196,28 +198,11 @@ class MainActivity : Activity() {
         }
         root.addView(aodSection)
         root.addView(label(
-            "Choose how Phantom keeps its clock visible after you lock the phone. Dim AOD uses very low brightness. Wake AOD uses your normal system brightness. Both keep the AOD visible until you press the power button again or open the lockscreen.",
+            "Wake AOD stays visible at your normal system brightness. A multicolour edge-light animation continuously races around all four screen edges while AOD is displayed.",
             12f,
             0xFFAAB6CE.toInt(),
             false
         ))
-        aodDimButton = actionButton("DIM AOD  ·  LOW-BRIGHTNESS CLOCK", 0xFF27354A.toInt())
-        aodDimButton.setOnClickListener {
-            prefs.edit().putString(PhantomOverlayService.PREF_AOD_MODE, PhantomOverlayService.AOD_MODE_DIM).apply()
-            notifyAodModeChanged()
-            refreshAodSelection()
-            Toast.makeText(this, "Dim AOD selected.", Toast.LENGTH_SHORT).show()
-        }
-        root.addView(aodDimButton, buttonParams().apply { topMargin = dp(12) })
-
-        aodWakeButton = actionButton("WAKE AOD  ·  SYSTEM BRIGHTNESS", 0xFF27354A.toInt())
-        aodWakeButton.setOnClickListener {
-            prefs.edit().putString(PhantomOverlayService.PREF_AOD_MODE, PhantomOverlayService.AOD_MODE_WAKE).apply()
-            notifyAodModeChanged()
-            refreshAodSelection()
-            Toast.makeText(this, "Wake AOD selected.", Toast.LENGTH_SHORT).show()
-        }
-        root.addView(aodWakeButton, buttonParams().apply { topMargin = dp(8) })
 
         protectionButton = actionButton("ACTIVATE PHANTOM LOCK", 0xFF526ED6.toInt())
         protectionButton.setOnClickListener { toggleProtection() }
@@ -225,7 +210,7 @@ class MainActivity : Activity() {
         root.addView(protectionButton, protectParams)
 
         val note = label(
-            "HOW IT WORKS\nPhantom starts its AOD Activity when Android reports that the phone has locked. Dim AOD uses very low brightness; Wake AOD uses the phone's normal system brightness. Both keep the AOD visible while the session is active. Press the power button again to turn the display fully off; waking the phone returns to the interactive Phantom lockscreen. Because the Galaxy A02 uses an LCD, the backlight remains on during AOD and battery use can be significant.\n\nA small padlock silently arms one fingerprint tap. An ordinary fingerprint tap displays “Fingerprint doesn't match” with haptic feedback. On phones with enrolled fingerprint hardware, Android's genuine biometric prompt is used. The Galaxy A02 has no fingerprint reader, so its armed tap is a visual unlock gesture.\n\n" +
+            "HOW IT WORKS\nPhantom starts its Wake AOD Activity when Android reports that the phone has locked. The clock stays at normal system brightness while multicolour edge lighting continuously races around the full screen perimeter. Press the power button again to turn the display fully off; waking the phone returns to the interactive Phantom lockscreen. Because the Galaxy A02 uses an LCD, the backlight remains on during AOD and battery use can be significant.\n\nA small padlock silently arms one fingerprint tap. An ordinary fingerprint tap displays “Fingerprint doesn't match” with haptic feedback. On phones with enrolled fingerprint hardware, Android's genuine biometric prompt is used. The Galaxy A02 has no fingerprint reader, so its armed tap is a visual unlock gesture.\n\n" +
                 "LOCAL MUSIC\nChoose audio files stored on your phone. Phantom plays those selected tracks directly, with previous, play/pause and next controls. It does not need notification-listener access and does not read or display your notifications.",
             12f,
             0xFF8793AD.toInt(),
@@ -367,7 +352,6 @@ class MainActivity : Activity() {
 
     private fun refreshDashboard() {
         refreshWallpaperStatus()
-        refreshAodSelection()
         val overlayGranted = Settings.canDrawOverlays(this)
         val cameraGranted = checkSelfPermission(android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED
         val enabled = prefs.getBoolean(PhantomOverlayService.PREF_ENABLED, false)
@@ -409,34 +393,6 @@ class MainActivity : Activity() {
         }
         protectionButton.background = rounded(
             if (enabled) 0xFF563044.toInt() else 0xFF526ED6.toInt(),
-            18f
-        )
-    }
-
-    private fun notifyAodModeChanged() {
-        if (!prefs.getBoolean(PhantomOverlayService.PREF_ENABLED, false)) return
-        try {
-            startService(
-                Intent(this, PhantomOverlayService::class.java)
-                    .setAction(PhantomOverlayService.ACTION_AOD_MODE_CHANGED)
-            )
-        } catch (_: Exception) {
-            // The selected mode is saved; the service will apply it on the next screen cycle.
-        }
-    }
-
-    private fun refreshAodSelection() {
-        if (!::aodDimButton.isInitialized || !::aodWakeButton.isInitialized) return
-        val selected = prefs.getString(
-            PhantomOverlayService.PREF_AOD_MODE,
-            PhantomOverlayService.AOD_MODE_WAKE
-        )
-        aodDimButton.background = rounded(
-            if (selected == PhantomOverlayService.AOD_MODE_DIM) 0xFF526ED6.toInt() else 0xFF27354A.toInt(),
-            18f
-        )
-        aodWakeButton.background = rounded(
-            if (selected == PhantomOverlayService.AOD_MODE_WAKE) 0xFF526ED6.toInt() else 0xFF27354A.toInt(),
             18f
         )
     }
