@@ -9,13 +9,28 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.graphics.PixelFormat
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import android.os.Build
-import android.os.IBinder
 import android.os.Handler
+import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
 import android.util.Log
+import android.view.Gravity
+import android.view.View
+import android.view.WindowManager
+import android.widget.Toast
 
+/**
+ * Owns Phantom protection and its lock window.
+ *
+ * The lock surface is attached directly to WindowManager. It no longer depends
+ * on Android repeatedly bringing PhantomLockActivity to the foreground when
+ * Home, Recents or the display state changes.
+ */
 class PhantomOverlayService : Service() {
 
     companion object {
@@ -23,9 +38,11 @@ class PhantomOverlayService : Service() {
         const val ACTION_STOP = "com.jaydencyril67.screenlock.action.STOP"
         const val ACTION_CLOSE_LOCK = "com.jaydencyril67.screenlock.action.CLOSE_LOCK"
         const val ACTION_RESTORE_LOCK = "com.jaydencyril67.screenlock.action.RESTORE_LOCK"
+        const val ACTION_SHOW_LOCK = "com.jaydencyril67.screenlock.action.SHOW_LOCK"
         const val PREFS = "phantom_lock_settings"
         const val PREF_ENABLED = "protection_enabled"
         const val PREF_SKIP_HOME_RESTORE_ONCE = "skip_home_restore_once"
+        const val PREF_UNLOCKED_UNTIL_SCREEN_OFF = "unlocked_until_screen_off"
 
         private const val TAG = "PhantomLock"
         private const val CHANNEL_ID = "phantom_lock_service"
@@ -34,29 +51,36 @@ class PhantomOverlayService : Service() {
 
     private var screenReceiverRegistered = false
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var restoreLockRunnable: Runnable? = null
+    private var windowManager: WindowManager? = null
+    private var lockSurface: PhantomLockSurface? = null
+    private var torchEnabled = false
+    private var torchCameraId: String? = null
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_SCREEN_OFF -> {
                     if (isProtectionEnabled()) {
-                        Log.d(TAG, "Screen going non-interactive: preparing lock surface before next wake")
-                        prepareLockScreen()
+                        // Unlock is valid only until the next screen-off event.
+                        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                            .putBoolean(PREF_UNLOCKED_UNTIL_SCREEN_OFF, false)
+                            .apply()
+                        Log.d(TAG, "Display off: Phantom will protect the next wake")
                     }
                 }
 
                 Intent.ACTION_SCREEN_ON -> {
-                    if (isProtectionEnabled()) {
-                        if (PhantomLockActivity.isAlive) {
-                            Log.d(TAG, "Screen interactive: pre-prepared Phantom activity is already alive")
-                        } else {
-                            // Recovery path for process death, missed screen-off events,
-                            // or a Samsung power-management restart while the display slept.
-                            Log.w(TAG, "No prepared lock activity found; using screen-on fallback")
-                            launchLockScreen(PhantomLockActivity.ACTION_WAKE)
-                        }
+                    if (isProtectionEnabled() && !isUnlockedUntilScreenOff()) {
+                        mainHandler.postDelayed({
+                            if (isProtectionEnabled() && !isUnlockedUntilScreenOff()) {
+                                showLockSurface()
+                            }
+                        }, 180L)
                     }
+                }
+
+                LocalMusicPlaybackService.ACTION_STATE_CHANGED -> {
+                    lockSurface?.refreshMedia()
                 }
             }
         }
@@ -64,6 +88,7 @@ class PhantomOverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         createNotificationChannel()
         registerScreenReceiver()
     }
@@ -78,27 +103,18 @@ class PhantomOverlayService : Service() {
             ACTION_START -> {
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                     .putBoolean(PREF_ENABLED, true)
+                    .putBoolean(PREF_UNLOCKED_UNTIL_SCREEN_OFF, false)
                     .commit()
             }
 
-            ACTION_RESTORE_LOCK -> {
-                // Home navigation is still transitioning when onUserLeaveHint()
-                // reaches the service. Starting the Activity immediately can lose
-                // the race to the launcher on Android 11 / Samsung One UI.
-                // Defer the restore until the launcher transition has settled.
-                restoreLockRunnable?.let(mainHandler::removeCallbacks)
-                restoreLockRunnable = Runnable {
-                    restoreLockRunnable = null
-                    if (isProtectionEnabled() && Settings.canDrawOverlays(this)) {
-                        Log.i(TAG, "Restoring Phantom after Home transition")
-                        launchLockScreen(PhantomLockActivity.ACTION_HOME_RESTORE)
-                    }
-                }
-                mainHandler.postDelayed(restoreLockRunnable!!, 320L)
+            ACTION_RESTORE_LOCK, ACTION_SHOW_LOCK -> {
+                // Kept as a compatibility command for older Phantom components.
+                mainHandler.post { showLockSurface() }
             }
         }
 
         if (!isProtectionEnabled()) {
+            removeLockSurface()
             stopSelf()
             return START_NOT_STICKY
         }
@@ -107,11 +123,20 @@ class PhantomOverlayService : Service() {
             getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putBoolean(PREF_ENABLED, false)
                 .commit()
+            removeLockSurface()
             stopSelf()
             return START_NOT_STICKY
         }
 
         startForeground(NOTIFICATION_ID, buildNotification())
+
+        // START_STICKY can recreate this service without its original intent.
+        // Restore the surface only when the user has not already unlocked this
+        // display session.
+        if (intent == null && !isUnlockedUntilScreenOff()) {
+            mainHandler.post { showLockSurface() }
+        }
+
         return START_STICKY
     }
 
@@ -119,47 +144,179 @@ class PhantomOverlayService : Service() {
         getSharedPreferences(PREFS, MODE_PRIVATE)
             .getBoolean(PREF_ENABLED, false)
 
-    /**
-     * Start and fully create the lock Activity while the display is non-interactive.
-     * The Activity is showWhenLocked but deliberately does not turn the display on.
-     * This moves Activity creation/layout work out of the screen-on race.
-     */
-    private fun prepareLockScreen() {
-        if (!isProtectionEnabled() || !Settings.canDrawOverlays(this)) return
+    private fun isUnlockedUntilScreenOff(): Boolean =
+        getSharedPreferences(PREFS, MODE_PRIVATE)
+            .getBoolean(PREF_UNLOCKED_UNTIL_SCREEN_OFF, false)
 
-        if (PhantomLockActivity.isAlive) {
-            Log.d(TAG, "Phantom lock activity already prepared")
+    private fun showLockSurface() {
+        if (!isProtectionEnabled() || isUnlockedUntilScreenOff()) return
+
+        if (!Settings.canDrawOverlays(this)) {
+            Log.w(TAG, "Overlay permission was revoked; disabling Phantom protection")
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putBoolean(PREF_ENABLED, false)
+                .commit()
+            removeLockSurface()
+            stopSelf()
             return
         }
 
-        launchLockScreen(PhantomLockActivity.ACTION_PREPARE)
-    }
+        if (lockSurface != null) return
 
-    private fun launchLockScreen(action: String) {
-        if (!isProtectionEnabled() || !Settings.canDrawOverlays(this)) return
+        val surface = PhantomLockSurface(
+            context = this,
+            onUnlock = { completeUnlock() },
+            onFlashlight = { toggleFlashlight() },
+            onCamera = { openCameraShortcut() },
+            onChooseMusic = { openMusicPicker() }
+        )
+
+        val flags = (
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+            )
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            flags,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 0
+            y = 0
+            alpha = 1f
+            dimAmount = 0f
+            setTitle("Phantom Lock Surface")
+        }
 
         try {
-            val intent = Intent(this, PhantomLockActivity::class.java).apply {
-                this.action = action
-                addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                        Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
-                        Intent.FLAG_ACTIVITY_NO_ANIMATION
-                )
-            }
-            startActivity(intent)
-            Log.i(TAG, "Phantom lock Activity launch requested: $action")
+            windowManager?.addView(surface, params)
+            lockSurface = surface
+            Log.i(TAG, "Service-owned Phantom lock surface attached")
         } catch (error: Exception) {
-            Log.e(TAG, "Unable to launch Phantom lock Activity ($action)", error)
+            surface.dispose()
+            Log.e(TAG, "Unable to attach Phantom lock surface", error)
+            Toast.makeText(
+                this,
+                "Phantom could not display its lock surface. Check overlay access.",
+                Toast.LENGTH_LONG
+            ).show()
         }
+    }
+
+    private fun completeUnlock() {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+            .putBoolean(PREF_UNLOCKED_UNTIL_SCREEN_OFF, true)
+            .putBoolean(PREF_SKIP_HOME_RESTORE_ONCE, true)
+            .commit()
+        removeLockSurface()
+        Log.i(TAG, "Phantom unlocked for the current display session")
+    }
+
+    private fun removeLockSurface() {
+        val surface = lockSurface ?: return
+        lockSurface = null
+        surface.dispose()
+        try {
+            windowManager?.removeView(surface)
+        } catch (_: Exception) {
+            // The window may already have been detached by the system.
+        }
+    }
+
+    private fun toggleFlashlight() {
+        if (checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(
+                this,
+                "Allow camera access in Phantom settings to use the flashlight.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        try {
+            val manager = getSystemService(CAMERA_SERVICE) as CameraManager
+            val id = torchCameraId ?: manager.cameraIdList.firstOrNull { cameraId ->
+                manager.getCameraCharacteristics(cameraId)
+                    .get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+            }?.also { torchCameraId = it }
+
+            if (id == null) {
+                Toast.makeText(this, "Flashlight is not available on this device.", Toast.LENGTH_SHORT).show()
+                return
+            }
+
+            torchEnabled = !torchEnabled
+            manager.setTorchMode(id, torchEnabled)
+            lockSurface?.setFlashlightOn(torchEnabled)
+        } catch (error: Exception) {
+            torchEnabled = false
+            lockSurface?.setFlashlightOn(false)
+            Log.e(TAG, "Unable to change flashlight state", error)
+            Toast.makeText(this, "Could not switch the flashlight.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun openCameraShortcut() {
+        removeLockSurface()
+        try {
+            startActivity(
+                Intent(this, PhantomCameraShortcutActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (error: Exception) {
+            Log.e(TAG, "Unable to open camera shortcut", error)
+            showLockSurface()
+        }
+    }
+
+    private fun openMusicPicker() {
+        removeLockSurface()
+        try {
+            startActivity(
+                Intent(this, PhantomMusicPickerActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (error: Exception) {
+            Log.e(TAG, "Unable to open music picker", error)
+            showLockSurface()
+        }
+    }
+
+    private fun disableProtection() {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+            .putBoolean(PREF_ENABLED, false)
+            .putBoolean(PREF_UNLOCKED_UNTIL_SCREEN_OFF, false)
+            .commit()
+
+        removeLockSurface()
+        turnTorchOff()
+        sendBroadcast(Intent(ACTION_CLOSE_LOCK).setPackage(packageName))
+        stopForeground(true)
+        stopSelf()
+    }
+
+    private fun turnTorchOff() {
+        if (!torchEnabled) return
+        try {
+            torchCameraId?.let {
+                (getSystemService(CAMERA_SERVICE) as CameraManager).setTorchMode(it, false)
+            }
+        } catch (_: Exception) {
+            // The camera may already be unavailable.
+        }
+        torchEnabled = false
     }
 
     private fun registerScreenReceiver() {
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_SCREEN_ON)
+            addAction(LocalMusicPlaybackService.ACTION_STATE_CHANGED)
         }
 
         if (Build.VERSION.SDK_INT >= 33) {
@@ -182,7 +339,7 @@ class PhantomOverlayService : Service() {
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentTitle("Phantom Lock is active")
-            .setContentText("Running in the background. Open Phantom Lock to manage protection.")
+            .setContentText("Protection is running. Open Phantom to manage it.")
             .setContentIntent(openApp)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -205,19 +362,10 @@ class PhantomOverlayService : Service() {
         }
     }
 
-    private fun disableProtection() {
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-            .putBoolean(PREF_ENABLED, false)
-            .commit()
-
-        sendBroadcast(Intent(ACTION_CLOSE_LOCK).setPackage(packageName))
-        stopForeground(true)
-        stopSelf()
-    }
-
     override fun onDestroy() {
-        restoreLockRunnable?.let(mainHandler::removeCallbacks)
-        restoreLockRunnable = null
+        mainHandler.removeCallbacksAndMessages(null)
+        removeLockSurface()
+        turnTorchOff()
         if (screenReceiverRegistered) {
             try {
                 unregisterReceiver(screenReceiver)
