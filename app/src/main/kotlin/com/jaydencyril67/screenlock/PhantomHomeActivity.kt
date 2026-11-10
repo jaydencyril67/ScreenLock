@@ -571,7 +571,7 @@ class PhantomHomeActivity : AppCompatActivity() {
             clipToOutline = true
         }
         val search = SearchView(this).apply {
-            isIconifiedByDefault = false
+            setIconifiedByDefault(false)
             isIconified = false
             queryHint = "Search apps"
             maxWidth = Int.MAX_VALUE
