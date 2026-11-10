@@ -59,7 +59,6 @@ class PhantomHomeActivity : Activity() {
     private var drawerOverlay: FrameLayout? = null
     private var drawerAppsContainer: LinearLayout? = null
     private var drawerSearch: EditText? = null
-    private var lockRestoreInProgress = false
 
     private val clockTick = object : Runnable {
         override fun run() {
@@ -120,59 +119,8 @@ class PhantomHomeActivity : Activity() {
         handler.removeCallbacks(clockTick)
         handler.post(clockTick)
 
-        // If Phantom is the selected Android Home app, Home navigation returns
-        // here in the foreground. Restore the app-level lock from this visible
-        // launcher Activity rather than depending only on a background service
-        // to launch an Activity (which Android 11 may defer or block).
-        restoreLockFromForegroundHome()
-    }
-
-    private fun restoreLockFromForegroundHome() {
-        if (lockRestoreInProgress || isFinishing || isDestroyed) return
-        val preferences = getSharedPreferences(
-            PhantomOverlayService.PREFS,
-            MODE_PRIVATE
-        )
-        if (preferences.getBoolean(PhantomOverlayService.PREF_SKIP_HOME_RESTORE_ONCE, false)) {
-            preferences.edit()
-                .remove(PhantomOverlayService.PREF_SKIP_HOME_RESTORE_ONCE)
-                .commit()
-            return
-        }
-        val enabled = preferences.getBoolean(
-            PhantomOverlayService.PREF_ENABLED,
-            false
-        )
-        if (!enabled) return
-
-        lockRestoreInProgress = true
-        handler.postDelayed({
-            if (isFinishing || isDestroyed) {
-                lockRestoreInProgress = false
-                return@postDelayed
-            }
-            val stillEnabled = getSharedPreferences(
-                PhantomOverlayService.PREFS,
-                MODE_PRIVATE
-            ).getBoolean(PhantomOverlayService.PREF_ENABLED, false)
-            if (stillEnabled) {
-                try {
-                    startActivity(
-                        Intent(this, PhantomLockActivity::class.java).apply {
-                            action = PhantomLockActivity.ACTION_HOME_RESTORE
-                            addFlags(
-                                Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                                    Intent.FLAG_ACTIVITY_NO_ANIMATION
-                            )
-                        }
-                    )
-                } catch (_: Exception) {
-                    // The foreground service remains the recovery fallback.
-                }
-            }
-            lockRestoreInProgress = false
-        }, 120L)
+        // Phantom's foreground service owns the lock window. Home must not
+        // relaunch a lock Activity on top of the launcher.
     }
 
     override fun onPause() {
