@@ -315,6 +315,10 @@ class PhantomLockActivity : Activity() {
             gravity = Gravity.CENTER
             includeFontPadding = false
             setTextColor(if (dimMode) 0xFF414141.toInt() else 0xFFAAA398.toInt())
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Tap to arm fingerprint unlock"
+            setOnClickListener { armFingerprint() }
         }
         root.addView(
             battery,
@@ -323,6 +327,86 @@ class PhantomLockActivity : Activity() {
                 dp(28),
                 Gravity.BOTTOM
             ).apply { bottomMargin = dp(48) }
+        )
+
+        // Use the same fingerprint artwork, one-second hold and biometric
+        // authentication path as the full Phantom lockscreen.
+        val aodSensorStack = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            clipChildren = false
+            clipToPadding = false
+        }
+        var aodFingerprintTouchActive = false
+        var aodFingerprintStartedArmed = false
+        var aodFingerprintHold: Runnable? = null
+        val aodFingerprint = ImageView(this).apply {
+            setImageResource(R.drawable.ic_s20_fingerprint)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            imageTintList = ColorStateList.valueOf(
+                if (dimMode) 0xFF555555.toInt() else 0xFFE9E3D9.toInt()
+            )
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Fingerprint"
+            setOnTouchListener { view, event ->
+                when (event.actionMasked) {
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        aodFingerprintTouchActive = true
+                        aodFingerprintStartedArmed = armed
+                        if (!authenticating && !unlockPending) {
+                            val hold = Runnable {
+                                if (aodFingerprintTouchActive &&
+                                    armed == aodFingerprintStartedArmed &&
+                                    !authenticating && !unlockPending
+                                ) onFingerprintPressed()
+                            }
+                            aodFingerprintHold = hold
+                            handler.postDelayed(hold, 1_000L)
+                        }
+                        true
+                    }
+                    android.view.MotionEvent.ACTION_UP,
+                    android.view.MotionEvent.ACTION_CANCEL -> {
+                        aodFingerprintTouchActive = false
+                        aodFingerprintHold?.let(handler::removeCallbacks)
+                        aodFingerprintHold = null
+                        view.isPressed = false
+                        true
+                    }
+                    else -> true
+                }
+            }
+        }
+        fingerprintView = aodFingerprint
+        aodSensorStack.addView(
+            aodFingerprint,
+            LinearLayout.LayoutParams(dp(38), dp(38))
+        )
+        fingerprintHint = TextView(this).apply {
+            text = ""
+            textSize = 8f
+            letterSpacing = 0.15f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            setTextColor(if (dimMode) 0xFF444444.toInt() else 0xFFB9B0A3.toInt())
+            setPadding(0, dp(9), 0, 0)
+        }
+        aodSensorStack.addView(
+            fingerprintHint,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dp(27)
+            )
+        )
+        root.addView(
+            aodSensorStack,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            ).apply { bottomMargin = dp(92) }
         )
 
         val hint = TextView(this).apply {
