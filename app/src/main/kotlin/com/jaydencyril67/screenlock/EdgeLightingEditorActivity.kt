@@ -17,6 +17,7 @@ import android.view.View
 import android.view.animation.LinearInterpolator
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
 
@@ -105,6 +106,40 @@ class EdgeLightingEditorActivity : Activity() {
             }
         )
 
+        val initialThickness = PhantomEdgeShape.loadThickness(this)
+        val thicknessLabel = textLabel(
+            "LIGHT THICKNESS  ·  ${"%.1f".format(initialThickness)} DP",
+            10f,
+            0xFFE6C58F.toInt(),
+            true
+        ).apply {
+            letterSpacing = 0.08f
+            setPadding(0, dp(2), 0, dp(2))
+        }
+        root.addView(thicknessLabel)
+        val thicknessSlider = SeekBar(this).apply {
+            max = 8
+            progress = ((initialThickness - 1f) / 0.5f).toInt().coerceIn(0, 8)
+            progressTintList = android.content.res.ColorStateList.valueOf(0xFF8EA9F5.toInt())
+            thumbTintList = android.content.res.ColorStateList.valueOf(0xFFE6C58F.toInt())
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                    val thickness = 1f + progress * 0.5f
+                    outlineView.setThickness(thickness)
+                    thicknessLabel.text = "LIGHT THICKNESS  ·  ${"%.1f".format(thickness)} DP"
+                }
+                override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+                override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+            })
+        }
+        root.addView(
+            thicknessSlider,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(38)
+            ).apply { bottomMargin = dp(4) }
+        )
+
         val buttons = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -117,6 +152,7 @@ class EdgeLightingEditorActivity : Activity() {
         val save = actionButton("SAVE OUTLINE", 0xFF526ED6.toInt())
         save.setOnClickListener {
             PhantomEdgeShape.save(this, outlineView.currentPoints())
+            PhantomEdgeShape.saveThickness(this, outlineView.currentThickness())
             Toast.makeText(this, "Custom edge outline saved.", Toast.LENGTH_SHORT).show()
             finish()
         }
@@ -177,6 +213,7 @@ private class EdgeLightingEditorView(
 ) : View(context) {
     private val density = resources.displayMetrics.density
     private val points = PhantomEdgeShape.load(context)
+    private var edgeThickness = PhantomEdgeShape.loadThickness(context)
     private val screenBounds = RectF()
     private val deviceBounds = RectF()
     private val outline = Path()
@@ -214,21 +251,21 @@ private class EdgeLightingEditorView(
     }
     private val ambientPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = dp(2f)
+        strokeWidth = dp(edgeThickness * 0.675f)
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
         alpha = 205
     }
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = dp(7f)
+        strokeWidth = dp(edgeThickness * 2.75f)
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
         alpha = 85
     }
     private val runnerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = dp(2.5f)
+        strokeWidth = dp(edgeThickness * 0.95f)
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
@@ -253,6 +290,16 @@ private class EdgeLightingEditorView(
     }
 
     fun currentPoints(): FloatArray = points.copyOf()
+
+    fun currentThickness(): Float = edgeThickness
+
+    fun setThickness(value: Float) {
+        edgeThickness = value.coerceIn(1f, 5f)
+        ambientPaint.strokeWidth = dp(edgeThickness * 0.675f)
+        glowPaint.strokeWidth = dp(edgeThickness * 2.75f)
+        runnerPaint.strokeWidth = dp(edgeThickness * 0.95f)
+        invalidate()
+    }
 
     fun resetShape() {
         val defaults = PhantomEdgeShape.defaultPoints()
