@@ -4,6 +4,7 @@
         <item name="android:fontFamily">@font/stix_two_text</item>
         <item name="android:colorAccent">#9BBAFF</item>
         <item name="android:windowBackground">#05070F</item>
+        <item name="android:forceDarkAllowed">false</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:windowNoTitle">true</item>
@@ -13,13 +14,12 @@
     </style>
 
     <!-- Dark One UI 8 component theme, isolated to Phantom's launcher activity. -->
-    <style name="PhantomOneUITheme" parent="Theme.AppCompat.NoActionBar">
+    <style name="PhantomOneUITheme" parent="OneUITheme">
         <item name="colorPrimary">#9BBAFF</item>
         <item name="colorPrimaryDark">#05070F</item>
         <item name="colorAccent">#9BBAFF</item>
         <item name="colorControlActivated">#9BBAFF</item>
         <item name="android:colorAccent">#9BBAFF</item>
-        <item name="android:fontFamily">sans</item>
         <item name="android:windowBackground">#05070F</item>
         <item name="android:statusBarColor">#000000</item>
         <item name="android:navigationBarColor">#000000</item>
