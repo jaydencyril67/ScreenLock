@@ -42,6 +42,7 @@ class MainActivity : Activity() {
     private lateinit var overlayButton: Button
     private lateinit var cameraPermissionButton: Button
     private lateinit var protectionButton: Button
+    private lateinit var homeLauncherButton: Button
     private lateinit var wallpaperStatus: TextView
     private lateinit var resetWallpaperButton: Button
 
@@ -93,7 +94,14 @@ class MainActivity : Activity() {
             false
         ))
 
-        val homeLauncherButton = actionButton("SET PHANTOM AS DEFAULT HOME", 0xFF243B63.toInt())
+        root.addView(label(
+            "IMPORTANT: Android will keep opening Samsung Home until Phantom is selected as the default Home app. Choose Phantom on the next screen.",
+            12f,
+            0xFFB7C5DF.toInt(),
+            false
+        ).apply { setPadding(0, dp(12), 0, 0) })
+
+        homeLauncherButton = actionButton("SET PHANTOM AS DEFAULT HOME", 0xFF243B63.toInt())
         homeLauncherButton.setOnClickListener {
             try {
                 startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
@@ -346,7 +354,28 @@ class MainActivity : Activity() {
         }, 3_000L)
     }
 
+    private fun refreshHomeLauncherStatus() {
+        if (!::homeLauncherButton.isInitialized) return
+
+        val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        val resolved = packageManager.resolveActivity(homeIntent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
+        val activityInfo = resolved?.activityInfo
+        val isPhantomDefault = activityInfo?.packageName == packageName &&
+            activityInfo.name.endsWith("PhantomHomeActivity")
+
+        homeLauncherButton.text = if (isPhantomDefault) {
+            "PHANTOM IS YOUR DEFAULT HOME"
+        } else {
+            "SET PHANTOM AS DEFAULT HOME"
+        }
+        homeLauncherButton.background = rounded(
+            if (isPhantomDefault) 0xFF214B42.toInt() else 0xFF243B63.toInt(),
+            18f
+        )
+    }
+
     private fun refreshDashboard() {
+        refreshHomeLauncherStatus()
         refreshWallpaperStatus()
         val overlayGranted = Settings.canDrawOverlays(this)
         val cameraGranted = checkSelfPermission(android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED
