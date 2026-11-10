@@ -32,7 +32,10 @@ object PhantomWallpaperStore {
  * Full-screen wallpaper surface. A chosen image is read through the persisted
  * document URI permission; no broad storage permission is required.
  */
-class PhantomWallpaperView(context: Context) : View(context) {
+class PhantomWallpaperView(
+    context: Context,
+    private val homeStyle: Boolean = false
+) : View(context) {
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
@@ -158,7 +161,72 @@ class PhantomWallpaperView(context: Context) : View(context) {
             return
         }
 
-        drawDefaultWallpaper(canvas, w, h)
+        if (homeStyle) {
+            drawDefaultHomeWallpaper(canvas, w, h)
+        } else {
+            drawDefaultWallpaper(canvas, w, h)
+        }
+    }
+
+    private fun drawDefaultHomeWallpaper(canvas: Canvas, w: Float, h: Float) {
+        canvas.drawColor(Color.rgb(82, 69, 151))
+
+        paint.shader = LinearGradient(
+            0f, 0f, w * 0.22f, h,
+            intArrayOf(
+                Color.rgb(160, 139, 224),
+                Color.rgb(112, 111, 205),
+                Color.rgb(78, 131, 204),
+                Color.rgb(39, 135, 168)
+            ),
+            floatArrayOf(0f, 0.39f, 0.72f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawRect(0f, 0f, w, h, paint)
+        paint.shader = null
+
+        paint.shader = RadialGradient(
+            w * 0.82f,
+            h * 0.18f,
+            max(w, h) * 0.72f,
+            intArrayOf(
+                0x66F4C7FF,
+                0x24B7C8FF,
+                Color.TRANSPARENT
+            ),
+            floatArrayOf(0f, 0.48f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawRect(0f, 0f, w, h, paint)
+        paint.shader = null
+
+        paint.shader = RadialGradient(
+            w * 0.12f,
+            h * 0.78f,
+            max(w, h) * 0.58f,
+            intArrayOf(
+                0x3359E2D5,
+                0x123F93C4,
+                Color.TRANSPARENT
+            ),
+            floatArrayOf(0f, 0.52f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawRect(0f, 0f, w, h, paint)
+        paint.shader = null
+
+        paint.shader = LinearGradient(
+            0f, h * 0.56f, 0f, h,
+            intArrayOf(
+                Color.TRANSPARENT,
+                0x14090E27,
+                0x46090E27
+            ),
+            null,
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawRect(0f, h * 0.56f, w, h, paint)
+        paint.shader = null
     }
 
     private fun drawDefaultWallpaper(canvas: Canvas, w: Float, h: Float) {
