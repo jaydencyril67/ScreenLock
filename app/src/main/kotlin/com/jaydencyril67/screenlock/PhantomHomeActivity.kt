@@ -129,11 +129,21 @@ class PhantomHomeActivity : Activity() {
 
     private fun restoreLockFromForegroundHome() {
         if (lockRestoreInProgress || isFinishing || isDestroyed) return
-        val enabled = getSharedPreferences(
+        val preferences = getSharedPreferences(
             PhantomOverlayService.PREFS,
             MODE_PRIVATE
-        ).getBoolean(PhantomOverlayService.PREF_ENABLED, false)
-        if (!enabled || PhantomLockActivity.isAlive) return
+        )
+        if (preferences.getBoolean(PhantomOverlayService.PREF_SKIP_HOME_RESTORE_ONCE, false)) {
+            preferences.edit()
+                .remove(PhantomOverlayService.PREF_SKIP_HOME_RESTORE_ONCE)
+                .commit()
+            return
+        }
+        val enabled = preferences.getBoolean(
+            PhantomOverlayService.PREF_ENABLED,
+            false
+        )
+        if (!enabled) return
 
         lockRestoreInProgress = true
         handler.postDelayed({
@@ -145,7 +155,7 @@ class PhantomHomeActivity : Activity() {
                 PhantomOverlayService.PREFS,
                 MODE_PRIVATE
             ).getBoolean(PhantomOverlayService.PREF_ENABLED, false)
-            if (stillEnabled && !PhantomLockActivity.isAlive) {
+            if (stillEnabled) {
                 try {
                     startActivity(
                         Intent(this, PhantomLockActivity::class.java).apply {
