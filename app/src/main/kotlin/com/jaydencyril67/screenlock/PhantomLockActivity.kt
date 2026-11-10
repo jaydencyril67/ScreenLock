@@ -435,6 +435,7 @@ class PhantomLockActivity : Activity() {
     }
 
     private fun buildLockScreen() {
+        if (isAodVisible) releaseAodScreenHold()
         isAodVisible = false
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         window.attributes = window.attributes.apply {
@@ -1227,7 +1228,7 @@ class PhantomLockActivity : Activity() {
             // Devices without a supported fingerprint reader use the existing
             // visual-unlock fallback immediately at the one-second threshold.
             unlockPending = false
-            finish()
+            finishAfterFingerprintUnlock()
             return
         }
 
@@ -1262,7 +1263,7 @@ class PhantomLockActivity : Activity() {
                     ) {
                         super.onAuthenticationSucceeded(result)
                         authenticating = false
-                        finish()
+                        finishAfterFingerprintUnlock()
                     }
 
                     override fun onAuthenticationFailed() {
@@ -1283,6 +1284,22 @@ class PhantomLockActivity : Activity() {
         } catch (_: Exception) {
             authenticating = false
             showMismatch()
+        }
+    }
+
+    private fun finishAfterFingerprintUnlock() {
+        if (isAodVisible) releaseAodScreenHold()
+        finish()
+    }
+
+    private fun releaseAodScreenHold() {
+        try {
+            startService(
+                Intent(this, PhantomOverlayService::class.java)
+                    .setAction(PhantomOverlayService.ACTION_AOD_EXIT)
+            )
+        } catch (_: Exception) {
+            // The service releases its wake lock when protection stops or the process exits.
         }
     }
 
