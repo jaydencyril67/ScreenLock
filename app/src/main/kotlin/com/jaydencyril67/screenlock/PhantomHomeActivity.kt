@@ -64,6 +64,9 @@ class PhantomHomeActivity : Activity() {
     private var drawerGestureDetector: GestureDetector? = null
     private var drawerPageCount = 0
     private var drawerCurrentPage = 0
+    private var drawerTouchStartX = 0f
+    private var drawerTouchStartY = 0f
+    private var drawerHorizontalSwipeIntercepted = false
 
     private val clockTick = object : Runnable {
         override fun run() {
@@ -151,6 +154,34 @@ class PhantomHomeActivity : Activity() {
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         drawerGestureDetector?.onTouchEvent(event)
         homeGestureDetector.onTouchEvent(event)
+
+        if (drawerOverlay != null) {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    drawerTouchStartX = event.x
+                    drawerTouchStartY = event.y
+                    drawerHorizontalSwipeIntercepted = false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.x - drawerTouchStartX
+                    val dy = event.y - drawerTouchStartY
+                    if (!drawerHorizontalSwipeIntercepted &&
+                        abs(dx) > dp(18) && abs(dx) > abs(dy)
+                    ) {
+                        // Stop the app tile underneath from treating a page swipe
+                        // as a tap and accidentally launching an application.
+                        drawerHorizontalSwipeIntercepted = true
+                    }
+                    if (drawerHorizontalSwipeIntercepted) return true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (drawerHorizontalSwipeIntercepted) {
+                        drawerHorizontalSwipeIntercepted = false
+                        return true
+                    }
+                }
+            }
+        }
         return super.dispatchTouchEvent(event)
     }
 
