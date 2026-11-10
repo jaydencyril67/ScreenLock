@@ -1,6 +1,15 @@
-# Phantom Lock
+# Phantom
 
-A custom Samsung Galaxy S20-inspired lock screen for Android, designed for the Galaxy A02 / Android 11.
+Phantom is evolving from a lockscreen utility into a standalone Android Home experience for the Galaxy A02 / Android 11.
+
+## Home launcher foundation
+
+- `PhantomHomeActivity` is a dedicated Android Home activity, registered with `MAIN`, `HOME`, and `DEFAULT` intent categories.
+- The launcher is separate from `MainActivity` (setup and settings) and `PhantomLockActivity` (the existing lock surface).
+- The Home screen reuses the user's selected Phantom wallpaper, uses the bundled STIX Two Text family, and provides a searchable app drawer that launches installed apps.
+- Select Phantom from **Settings → Apps → Default apps → Home app**, or use the setup button in Phantom's app screen.
+- Samsung's status bar, navigation system, notification shade, and Android settings remain system-owned. Phantom does not pretend to replace privileged Samsung firmware components.
+- The current launcher foundation is intentionally lightweight. Custom control centre, notification presentation, ambient display, and edge-lighting modules are separate follow-up work; each will be implemented only within Android's available permissions and hardware capabilities.
 
 ## Lock-screen experience
 
@@ -24,11 +33,13 @@ The Galaxy A02 does not have a fingerprint reader. On that device, the armed tap
 
 ## Setup
 
-1. Grant **Display over other apps** permission.
-2. Activate Phantom Lock.
-3. Turn the screen off, then wake it with the power button.
-4. Tap the fingerprint once to see the mismatch message.
-5. Tap the small padlock, then tap the fingerprint to dismiss the lock surface.
+1. Open Phantom and choose **Set Phantom as default Home** to open Android's Home-app settings.
+2. Select Phantom as the Home app.
+3. Grant **Display over other apps** permission for the existing lock surface.
+4. Activate Phantom protection.
+5. Turn the screen off, then wake it with the power button.
+6. Tap the fingerprint once to see the mismatch message.
+7. Tap the small padlock, then tap the fingerprint to dismiss the lock surface.
 
 A persistent foreground-service notification provides an emergency **Turn off** action. Protection restores after reboot when it was previously enabled and overlay permission remains granted.
 
