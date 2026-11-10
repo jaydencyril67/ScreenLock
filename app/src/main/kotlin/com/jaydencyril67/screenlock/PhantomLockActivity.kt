@@ -43,6 +43,9 @@ class PhantomLockActivity : Activity() {
     companion object {
         private const val REQUEST_CAMERA_PERMISSION = 4171
         private const val REQUEST_LOCAL_MUSIC = 4172
+        private const val CAMERA_ACTION_NONE = 0
+        private const val CAMERA_ACTION_FLASH = 1
+        private const val CAMERA_ACTION_OPEN_CAMERA = 2
         const val ACTION_PREPARE = "com.jaydencyril67.screenlock.action.PREPARE_LOCK"
         const val ACTION_WAKE = "com.jaydencyril67.screenlock.action.WAKE_LOCK"
 
@@ -74,6 +77,7 @@ class PhantomLockActivity : Activity() {
     private var externalShortcutLaunched = false
     private var flashEnabled = false
     private var flashCameraId: String? = null
+    private var pendingCameraAction = CAMERA_ACTION_NONE
     private lateinit var flashLabel: TextView
 
     private val clockTick = object : Runnable {
@@ -794,14 +798,31 @@ class PhantomLockActivity : Activity() {
         return Pair(column, label)
     }
 
-    private fun toggleFlashlight() {
-        if (checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(
-                arrayOf(android.Manifest.permission.CAMERA),
-                REQUEST_CAMERA_PERMISSION
-            )
+    private fun requestCameraPermission(action: Int) {
+        if (checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            runCameraAction(action)
             return
         }
+
+        pendingCameraAction = action
+        requestPermissions(
+            arrayOf(android.Manifest.permission.CAMERA),
+            REQUEST_CAMERA_PERMISSION
+        )
+    }
+
+    private fun runCameraAction(action: Int) {
+        when (action) {
+            CAMERA_ACTION_FLASH -> toggleFlashlightWithPermission()
+            CAMERA_ACTION_OPEN_CAMERA -> openCameraApp()
+        }
+    }
+
+    private fun toggleFlashlight() {
+        requestCameraPermission(CAMERA_ACTION_FLASH)
+    }
+
+    private fun toggleFlashlightWithPermission() {
         val manager = getSystemService(CAMERA_SERVICE) as CameraManager
         try {
             val cameraId = flashCameraId ?: manager.cameraIdList.firstOrNull { id ->
@@ -825,7 +846,7 @@ class PhantomLockActivity : Activity() {
             flashEnabled = false
             flashLabel.text = "FLASHLIGHT"
             android.widget.Toast.makeText(
-                this, "Allow camera permission to use the flashlight.",
+                this, "Camera permission is required to control the flashlight.",
                 android.widget.Toast.LENGTH_SHORT
             ).show()
         } catch (_: Exception) {
@@ -845,19 +866,29 @@ class PhantomLockActivity : Activity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_CAMERA_PERMISSION) {
+            val action = pendingCameraAction
+            pendingCameraAction = CAMERA_ACTION_NONE
+
             if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
-                toggleFlashlight()
+                runCameraAction(action)
             } else {
+                val message = if (action == CAMERA_ACTION_FLASH) {
+                    "Camera permission is needed to control the flashlight."
+                } else {
+                    "Camera permission is needed to use the camera shortcut."
+                }
                 android.widget.Toast.makeText(
-                    this,
-                    "Camera permission is needed to control the flashlight.",
-                    android.widget.Toast.LENGTH_SHORT
+                    this, message, android.widget.Toast.LENGTH_SHORT
                 ).show()
             }
         }
     }
 
     private fun launchCamera() {
+        requestCameraPermission(CAMERA_ACTION_OPEN_CAMERA)
+    }
+
+    private fun openCameraApp() {
         var cameraIntent = Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
         if (cameraIntent.resolveActivity(packageManager) == null) {
             cameraIntent = Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE)
