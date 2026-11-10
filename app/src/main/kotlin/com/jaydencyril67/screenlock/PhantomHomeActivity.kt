@@ -59,6 +59,7 @@ class PhantomHomeActivity : Activity() {
     private var drawerOverlay: FrameLayout? = null
     private var drawerAppsContainer: LinearLayout? = null
     private var drawerSearch: EditText? = null
+    private var lockRestoreInProgress = false
 
     private val clockTick = object : Runnable {
         override fun run() {
@@ -118,6 +119,50 @@ class PhantomHomeActivity : Activity() {
         if (::widgetHost.isInitialized) widgetHost.render()
         handler.removeCallbacks(clockTick)
         handler.post(clockTick)
+
+        // If Phantom is the selected Android Home app, Home navigation returns
+        // here in the foreground. Restore the app-level lock from this visible
+        // launcher Activity rather than depending only on a background service
+        // to launch an Activity (which Android 11 may defer or block).
+        restoreLockFromForegroundHome()
+    }
+
+    private fun restoreLockFromForegroundHome() {
+        if (lockRestoreInProgress || isFinishing || isDestroyed) return
+        val enabled = getSharedPreferences(
+            PhantomOverlayService.PREFS,
+            MODE_PRIVATE
+        ).getBoolean(PhantomOverlayService.PREF_ENABLED, false)
+        if (!enabled || PhantomLockActivity.isAlive) return
+
+        lockRestoreInProgress = true
+        handler.postDelayed({
+            if (isFinishing || isDestroyed) {
+                lockRestoreInProgress = false
+                return@postDelayed
+            }
+            val stillEnabled = getSharedPreferences(
+                PhantomOverlayService.PREFS,
+                MODE_PRIVATE
+            ).getBoolean(PhantomOverlayService.PREF_ENABLED, false)
+            if (stillEnabled && !PhantomLockActivity.isAlive) {
+                try {
+                    startActivity(
+                        Intent(this, PhantomLockActivity::class.java).apply {
+                            action = PhantomLockActivity.ACTION_HOME_RESTORE
+                            addFlags(
+                                Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                                    Intent.FLAG_ACTIVITY_NO_ANIMATION
+                            )
+                        }
+                    )
+                } catch (_: Exception) {
+                    // The foreground service remains the recovery fallback.
+                }
+            }
+            lockRestoreInProgress = false
+        }, 120L)
     }
 
     override fun onPause() {
