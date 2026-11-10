@@ -19,6 +19,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
 import android.util.Log
+import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
@@ -166,7 +167,7 @@ class PhantomOverlayService : Service() {
         if (lockSurface != null) return
 
         val surface = PhantomLockSurface(
-            context = this,
+            context = ContextThemeWrapper(this, R.style.AppTheme),
             onUnlock = { completeUnlock() },
             onFlashlight = { toggleFlashlight() },
             onCamera = { openCameraShortcut() },
