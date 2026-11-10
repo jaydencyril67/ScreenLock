@@ -506,29 +506,14 @@ class PhantomLockActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                cornerRadius = dp(22).toFloat()
-                setColor(0xD0161A22.toInt())
-                setStroke(dp(1), 0x48FFFFFF)
+                cornerRadius = dp(20).toFloat()
+                setColor(0xC9141820.toInt())
+                setStroke(dp(1), 0x28FFFFFF)
             }
             visibility = View.GONE
-            setPadding(dp(16), dp(15), dp(16), dp(14))
+            setPadding(dp(13), dp(12), dp(13), dp(10))
             clipToOutline = true
         }
-        val mediaHeading = TextView(this).apply {
-            text = "NOW PLAYING"
-            textSize = 9f
-            letterSpacing = 0.2f
-            setTextColor(0xFFD6B88F.toInt())
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            includeFontPadding = false
-        }
-        mediaContainer.addView(
-            mediaHeading,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(19)
-            )
-        )
 
         val mediaMainRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
