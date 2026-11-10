@@ -23,6 +23,7 @@ class PhantomOverlayService : Service() {
         const val ACTION_CLOSE_LOCK = "com.jaydencyril67.screenlock.action.CLOSE_LOCK"
         const val ACTION_RESTORE_LOCK = "com.jaydencyril67.screenlock.action.RESTORE_LOCK"
         const val ACTION_AOD_MODE_CHANGED = "com.jaydencyril67.screenlock.action.AOD_MODE_CHANGED"
+        const val ACTION_AOD_EXIT = "com.jaydencyril67.screenlock.action.AOD_EXIT"
         const val PREFS = "phantom_lock_settings"
         const val PREF_ENABLED = "protection_enabled"
         const val PREF_AOD_MODE = "aod_mode"
@@ -101,6 +102,8 @@ class PhantomOverlayService : Service() {
             ACTION_AOD_MODE_CHANGED -> {
                 if (!isDimAodSelected()) releaseDimAodWakeLock()
             }
+
+            ACTION_AOD_EXIT -> releaseDimAodWakeLock()
         }
 
         if (!isProtectionEnabled()) {
