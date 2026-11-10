@@ -184,15 +184,15 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Gradle 8.9
+      - name: Set up Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.9"
+          gradle-version: "8.11.1"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+          packages: "platform-tools platforms;android-36 build-tools;36.0.0"
 
       - name: Accept Android SDK licenses
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
@@ -283,7 +283,7 @@ jobs:
           set -euo pipefail
           APK="app/build/outputs/apk/sideload/release/app-sideload-release.apk"
           test -s "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
 
           if [ -n "$PREVIOUS_TAG" ]; then
             mkdir -p previous-release
@@ -294,8 +294,8 @@ jobs:
               exit 1
             fi
 
-            current_digest="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" | awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print $2; exit}')"
-            previous_digest="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$PREVIOUS_APK" | awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print $2; exit}')"
+            current_digest="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" | awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print $2; exit}')"
+            previous_digest="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$PREVIOUS_APK" | awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print $2; exit}')"
             if [ -z "$current_digest" ] || [ "$current_digest" != "$previous_digest" ]; then
               echo "::error::The release APK signing certificate does not match the previous production release."
               exit 1
