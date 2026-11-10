@@ -168,15 +168,9 @@ class PhantomOverlayService : Service() {
     private fun prepareLockScreen() {
         if (!isProtectionEnabled() || !Settings.canDrawOverlays(this)) return
 
-        // If the AOD is already visible, let the power button turn the display
-        // off normally. Otherwise replace the full lock surface with the prepared AOD.
-        if (PhantomLockActivity.isAlive && PhantomLockActivity.isAodVisible) {
-            Log.d(TAG, "AOD already visible; allowing the display to sleep")
-            return
-        }
-
-        // The Activity selects low-brightness/keep-awake or normal wake behavior
-        // from the user's saved setup preference.
+        // Re-send the prepare action even when the Activity already exists.
+        // This rebuilds its window using the latest saved AOD mode and ensures
+        // the AOD surface is the one presented when Android wakes the display.
         launchLockScreen(PhantomLockActivity.ACTION_AOD_PREPARE)
     }
 
