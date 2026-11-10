@@ -192,7 +192,7 @@ class PhantomHomeActivity : Activity() {
         }
 
         root.addView(
-            PhantomWallpaperView(this),
+            PhantomWallpaperView(this, homeStyle = true),
             FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
