@@ -93,7 +93,7 @@ class PhantomOverlayService : Service() {
                         launchLockScreen(PhantomLockActivity.ACTION_HOME_RESTORE)
                     }
                 }
-                mainHandler.postDelayed(restoreLockRunnable!!, 500L)
+                mainHandler.postDelayed(restoreLockRunnable!!, 320L)
             }
         }
 
@@ -144,6 +144,7 @@ class PhantomOverlayService : Service() {
                     Intent.FLAG_ACTIVITY_NEW_TASK or
                         Intent.FLAG_ACTIVITY_SINGLE_TOP or
                         Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
                         Intent.FLAG_ACTIVITY_NO_ANIMATION
                 )
             }
