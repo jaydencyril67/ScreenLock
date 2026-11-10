@@ -13,6 +13,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PathMeasure
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.SweepGradient
 import android.graphics.Matrix
@@ -497,7 +498,8 @@ class PhantomLockActivity : Activity() {
                 dp(26),
                 Gravity.TOP or Gravity.START
             ).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.265f).toInt()                marginStart = dp(29)
+                topMargin = (resources.displayMetrics.heightPixels * 0.265f).toInt()
+                marginStart = dp(29)
                 marginEnd = dp(20)
             }
         )
@@ -576,7 +578,9 @@ class PhantomLockActivity : Activity() {
             scaleType = ImageView.ScaleType.CENTER_CROP
             background = GradientDrawable().apply {
                 cornerRadius = dp(16).toFloat()
-                setColor(0xFF242A35.toInt())            }            clipToOutline = true
+                setColor(0xFF242A35.toInt())
+            }
+            clipToOutline = true
             contentDescription = "Album artwork"
         }
         mediaMainRow.addView(
@@ -774,8 +778,10 @@ class PhantomLockActivity : Activity() {
             text = ""
             textSize = 9f
             letterSpacing = 0.19f
-            setTextColor(0xC9E3DCD1.toInt())            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            gravity = Gravity.CENTER            includeFontPadding = false
+            setTextColor(0xC9E3DCD1.toInt())
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            gravity = Gravity.CENTER
+            includeFontPadding = false
             setPadding(0, dp(13), 0, 0)
         }
         sensorStack.addView(
@@ -972,9 +978,11 @@ class PhantomLockActivity : Activity() {
             data.data?.let(selected::add)
         }
 
-        val uris = selected.distinct()        if (uris.isEmpty()) return
+        val uris = selected.distinct()
+        if (uris.isEmpty()) return
 
-        uris.forEach { uri ->            try {
+        uris.forEach { uri ->
+            try {
                 contentResolver.takePersistableUriPermission(
                     uri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -996,7 +1004,8 @@ class PhantomLockActivity : Activity() {
             android.widget.Toast.makeText(
                 this,
                 "Could not start the local music player.",
-                android.widget.Toast.LENGTH_LONG            ).show()
+                android.widget.Toast.LENGTH_LONG
+            ).show()
         }
     }
 
