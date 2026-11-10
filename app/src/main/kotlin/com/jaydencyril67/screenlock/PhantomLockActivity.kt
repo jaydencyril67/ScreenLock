@@ -1438,40 +1438,51 @@ class PhantomLockActivity : Activity() {
 
 
 /**
- * A continuously moving multicolour light segment that follows the complete
- * rounded-rectangle perimeter of the display, behind the AOD clock and controls.
+ * Samsung-inspired edge lighting for Phantom's always-on display.
+ *
+ * A fine multicolour line traces the display perimeter while a brighter,
+ * shorter runner continuously travels around the same path.
  */
 private class PhantomEdgeLightingView(context: Context) : View(context) {
     private val density = resources.displayMetrics.density
     private val perimeter = Path()
-    private val segment = Path()
+    private val runner = Path()
     private val measure = PathMeasure()
     private val bounds = RectF()
     private val shaderMatrix = Matrix()
     private val rainbowColors = intArrayOf(
-        Color.RED,
-        0xFFFF8A00.toInt(),
-        Color.YELLOW,
-        Color.GREEN,
-        Color.CYAN,
-        Color.BLUE,
-        0xFFB000FF.toInt(),
-        Color.RED
+        0xFFFF315A.toInt(),
+        0xFFFF8A24.toInt(),
+        0xFFFFD84A.toInt(),
+        0xFF55E58A.toInt(),
+        0xFF35D9F2.toInt(),
+        0xFF477BFF.toInt(),
+        0xFFB65CFF.toInt(),
+        0xFFFF315A.toInt()
     )
     private var rainbow: SweepGradient? = null
-    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+
+    private val ambientPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
-        strokeWidth = 13f * density
-        setShadowLayer(18f * density, 0f, 0f, Color.WHITE)
+        strokeWidth = 1.35f * density
+        alpha = 175
     }
-    private val lightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val runnerGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
-        strokeWidth = 3.2f * density
+        strokeWidth = 5.5f * density
+        alpha = 105
     }
+    private val runnerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+        strokeWidth = 1.9f * density
+    }
+
     private var progress = 0f
     private var animator: ValueAnimator? = null
 
@@ -1479,7 +1490,7 @@ private class PhantomEdgeLightingView(context: Context) : View(context) {
         setLayerType(LAYER_TYPE_SOFTWARE, null)
         isClickable = false
         isFocusable = false
-        contentDescription = "Animated multicolour edge lighting"
+        contentDescription = "Samsung-style animated edge lighting"
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -1487,15 +1498,16 @@ private class PhantomEdgeLightingView(context: Context) : View(context) {
         if (w <= 0 || h <= 0) return
         val shader = SweepGradient(w / 2f, h / 2f, rainbowColors, null)
         rainbow = shader
-        glowPaint.shader = shader
-        lightPaint.shader = shader
+        ambientPaint.shader = shader
+        runnerGlowPaint.shader = shader
+        runnerPaint.shader = shader
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         animator?.cancel()
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 4_200L
+            duration = 3_600L
             repeatCount = ValueAnimator.INFINITE
             interpolator = LinearInterpolator()
             addUpdateListener {
@@ -1516,28 +1528,34 @@ private class PhantomEdgeLightingView(context: Context) : View(context) {
         super.onDraw(canvas)
         if (width <= 0 || height <= 0) return
 
-        val inset = 8f * density
+        // Keep the light close to the physical display edge, with restrained
+        // corner rounding rather than a large inset neon frame.
+        val inset = 2.5f * density
         bounds.set(inset, inset, width - inset, height - inset)
         perimeter.reset()
-        perimeter.addRoundRect(bounds, 19f * density, 19f * density, Path.Direction.CW)
+        perimeter.addRoundRect(bounds, 22f * density, 22f * density, Path.Direction.CW)
         measure.setPath(perimeter, false)
         val totalLength = measure.length
         if (totalLength <= 0f) return
 
-        val segmentLength = totalLength * 0.19f
-        val start = progress * totalLength
-        segment.reset()
-        val end = start + segmentLength
-        if (end <= totalLength) {
-            measure.getSegment(start, end, segment, true)
-        } else {
-            measure.getSegment(start, totalLength, segment, true)
-            measure.getSegment(0f, end - totalLength, segment, true)
-        }
-
+        // The fine multicolour edge remains visible around the complete screen.
         shaderMatrix.setRotate(progress * 360f, width / 2f, height / 2f)
         rainbow?.setLocalMatrix(shaderMatrix)
-        canvas.drawPath(segment, glowPaint)
-        canvas.drawPath(segment, lightPaint)
+        canvas.drawPath(perimeter, ambientPaint)
+
+        // A crisp travelling highlight creates the continuous racing motion.
+        val runnerLength = totalLength * 0.105f
+        val start = progress * totalLength
+        val end = start + runnerLength
+        runner.reset()
+        if (end <= totalLength) {
+            measure.getSegment(start, end, runner, true)
+        } else {
+            measure.getSegment(start, totalLength, runner, true)
+            measure.getSegment(0f, end - totalLength, runner, true)
+        }
+
+        canvas.drawPath(runner, runnerGlowPaint)
+        canvas.drawPath(runner, runnerPaint)
     }
 }
