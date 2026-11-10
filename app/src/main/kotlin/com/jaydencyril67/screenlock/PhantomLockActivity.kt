@@ -76,9 +76,9 @@ class PhantomLockActivity : Activity() {
     private lateinit var mediaTitle: TextView
     private lateinit var mediaArtwork: ImageView
     private lateinit var mediaSubtitle: TextView
-    private lateinit var mediaPlayPause: TextView
-    private lateinit var mediaPrevious: TextView
-    private lateinit var mediaNext: TextView
+    private lateinit var mediaPlayPause: ImageView
+    private lateinit var mediaPrevious: ImageView
+    private lateinit var mediaNext: ImageView
     private lateinit var mediaChoose: TextView
     private var fingerprintView: ImageView? = null
     private var externalShortcutLaunched = false
@@ -324,7 +324,7 @@ class PhantomLockActivity : Activity() {
             ).apply { bottomMargin = dp(8) }
         )
 
-        // Use the same fingerprint artwork, one-second hold and biometric
+        // Use the same fingerprint artwork, half-second hold and biometric
         // authentication path as the full Phantom lockscreen.
         val aodSensorStack = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -357,7 +357,7 @@ class PhantomLockActivity : Activity() {
                                 ) onFingerprintPressed()
                             }
                             aodFingerprintHold = hold
-                            handler.postDelayed(hold, 1_000L)
+                            handler.postDelayed(hold, 500L)
                         }
                         true
                     }
@@ -583,13 +583,13 @@ class PhantomLockActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, dp(8), 0, 0)
         }
-        mediaPrevious = mediaControl("⏮", "Previous track") {
+        mediaPrevious = mediaControl("previous", "Previous track") {
             sendMusicCommand(LocalMusicPlaybackService.ACTION_PREVIOUS)
         }
-        mediaPlayPause = mediaControl("▶", "Play or pause") {
+        mediaPlayPause = mediaControl("play", "Play or pause") {
             sendMusicCommand(LocalMusicPlaybackService.ACTION_TOGGLE)
         }
-        mediaNext = mediaControl("⏭", "Next track") {
+        mediaNext = mediaControl("next", "Next track") {
             sendMusicCommand(LocalMusicPlaybackService.ACTION_NEXT)
         }
         mediaControls.addView(mediaPrevious, LinearLayout.LayoutParams(dp(42), dp(42)))
@@ -685,7 +685,7 @@ class PhantomLockActivity : Activity() {
 
                         if (!authenticating && !unlockPending) {
                             // Both armed and unarmed touches use the same continuous
-                            // one-second hold. The result is evaluated only at the threshold:
+                            // half-second hold. The result is evaluated only at the threshold:
                             // armed = unlock; unarmed = mismatch.
                             val hold = Runnable {
                                 if (fingerprintTouchActive &&
@@ -696,7 +696,7 @@ class PhantomLockActivity : Activity() {
                                 }
                             }
                             fingerprintHoldRunnable = hold
-                            handler.postDelayed(hold, 1_000L)
+                            handler.postDelayed(hold, 500L)
                         }
                         true
                     }
@@ -788,17 +788,15 @@ class PhantomLockActivity : Activity() {
     }
 
     private fun mediaControl(
-        glyph: String,
+        icon: String,
         description: String,
         action: () -> Unit
-    ): TextView = TextView(this).apply {
-        text = glyph
+    ): ImageView = ImageView(this).apply {
         val isMain = description == "Play or pause"
-        textSize = if (isMain) 17f else 23f
-        setTextColor(if (isMain) 0xFF10131A.toInt() else 0xFFECE5DA.toInt())
-        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-        gravity = Gravity.CENTER
-        includeFontPadding = false
+        val tint = if (isMain) 0xFF10131A.toInt() else 0xFFECE5DA.toInt()
+        setImageDrawable(MediaControlDrawable(icon, tint))
+        scaleType = ImageView.ScaleType.FIT_CENTER
+        setPadding(dp(11), dp(11), dp(11), dp(11))
         contentDescription = description
         background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
@@ -870,7 +868,12 @@ class PhantomLockActivity : Activity() {
         mediaPlayPause.alpha = if (hasMusic) 1f else 0.35f
         mediaNext.isEnabled = hasMusic
         mediaNext.alpha = if (hasMusic) 1f else 0.35f
-        mediaPlayPause.text = if (playing) "Ⅱ" else "▶"
+        mediaPlayPause.setImageDrawable(
+            MediaControlDrawable(
+                if (playing) "pause" else "play",
+                0xFF10131A.toInt()
+            )
+        )
     }
 
     private fun sendMusicCommand(action: String) {
@@ -1116,7 +1119,7 @@ class PhantomLockActivity : Activity() {
 
     private fun armFingerprint() {
         // Battery tap arms the fingerprint immediately; the only detection timer
-        // is the one-second continuous press-and-hold on the fingerprint.
+        // is the half-second continuous press-and-hold on the fingerprint.
         armRunnable?.let(handler::removeCallbacks)
         armRunnable = null
         armed = true
@@ -1136,7 +1139,7 @@ class PhantomLockActivity : Activity() {
             return
         }
 
-        // This method is called by the one-second hold timer while the finger
+        // This method is called by the half-second hold timer while the finger
         // is still physically down. No ACTION_UP/release is needed.
         armed = false
         armRunnable?.let(handler::removeCallbacks)
@@ -1156,7 +1159,7 @@ class PhantomLockActivity : Activity() {
 
         if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
             // Devices without a supported fingerprint reader use the existing
-            // visual-unlock fallback immediately at the one-second threshold.
+            // visual-unlock fallback immediately at the half-second threshold.
             unlockPending = false
             finishAfterFingerprintUnlock()
             return
@@ -1372,4 +1375,66 @@ class PhantomLockActivity : Activity() {
         }
         super.onDestroy()
     }
+}
+
+/**
+ * Small Material-style vector controls for the lockscreen media player.
+ * Drawn locally so the buttons use real interface icons, never emoji glyphs.
+ */
+private class MediaControlDrawable(
+    private val icon: String,
+    private val tint: Int
+) : android.graphics.drawable.Drawable() {
+    private val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = tint
+        style = android.graphics.Paint.Style.FILL
+    }
+
+    override fun draw(canvas: android.graphics.Canvas) {
+        val b = bounds
+        if (b.isEmpty) return
+        val save = canvas.save()
+        canvas.translate(b.left.toFloat(), b.top.toFloat())
+        canvas.scale(b.width() / 24f, b.height() / 24f)
+        when (icon) {
+            "previous" -> {
+                canvas.drawRect(4f, 5f, 6.5f, 19f, paint)
+                val p = android.graphics.Path().apply {
+                    moveTo(19f, 5f); lineTo(8f, 12f); lineTo(19f, 19f); close()
+                }
+                canvas.drawPath(p, paint)
+            }
+            "next" -> {
+                canvas.drawRect(17.5f, 5f, 20f, 19f, paint)
+                val p = android.graphics.Path().apply {
+                    moveTo(5f, 5f); lineTo(16f, 12f); lineTo(5f, 19f); close()
+                }
+                canvas.drawPath(p, paint)
+            }
+            "pause" -> {
+                canvas.drawRoundRect(6f, 4.5f, 10f, 19.5f, 1f, 1f, paint)
+                canvas.drawRoundRect(14f, 4.5f, 18f, 19.5f, 1f, 1f, paint)
+            }
+            else -> {
+                val p = android.graphics.Path().apply {
+                    moveTo(7f, 4.5f); lineTo(19f, 12f); lineTo(7f, 19.5f); close()
+                }
+                canvas.drawPath(p, paint)
+            }
+        }
+        canvas.restoreToCount(save)
+    }
+
+    override fun setAlpha(alpha: Int) {
+        paint.alpha = alpha
+        invalidateSelf()
+    }
+
+    override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) {
+        paint.colorFilter = colorFilter
+        invalidateSelf()
+    }
+
+    @Deprecated("Deprecated in Android")
+    override fun getOpacity(): Int = android.graphics.PixelFormat.TRANSLUCENT
 }
