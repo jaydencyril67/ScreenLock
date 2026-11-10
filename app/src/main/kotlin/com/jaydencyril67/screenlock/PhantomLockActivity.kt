@@ -989,6 +989,9 @@ class PhantomLockActivity : Activity() {
             // Devices without a supported fingerprint reader use the existing
             // visual-unlock fallback immediately at the one-second threshold.
             unlockPending = false
+            getSharedPreferences(PhantomOverlayService.PREFS, MODE_PRIVATE).edit()
+                .putBoolean(PhantomOverlayService.PREF_SKIP_HOME_RESTORE_ONCE, true)
+                .commit()
             finish()
             return
         }
@@ -1024,6 +1027,9 @@ class PhantomLockActivity : Activity() {
                     ) {
                         super.onAuthenticationSucceeded(result)
                         authenticating = false
+                        getSharedPreferences(PhantomOverlayService.PREFS, MODE_PRIVATE).edit()
+                            .putBoolean(PhantomOverlayService.PREF_SKIP_HOME_RESTORE_ONCE, true)
+                            .commit()
                         finish()
                     }
 
