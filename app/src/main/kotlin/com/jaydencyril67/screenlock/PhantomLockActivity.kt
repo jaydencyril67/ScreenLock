@@ -232,14 +232,24 @@ class PhantomLockActivity : Activity() {
             screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
         }
 
+        var pendingAodTap: Runnable? = null
         val root = FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
             isClickable = true
             isFocusable = true
-            contentDescription = "Phantom always-on display. Touch to open the lockscreen."
+            contentDescription = "Phantom always-on display. Double tap to open the lockscreen."
             setOnClickListener {
-                buildLockScreen()
-                applyImmersiveMode()
+                val firstTap = pendingAodTap
+                if (firstTap != null) {
+                    handler.removeCallbacks(firstTap)
+                    pendingAodTap = null
+                    buildLockScreen()
+                    applyImmersiveMode()
+                } else {
+                    val waitForSecondTap = Runnable { pendingAodTap = null }
+                    pendingAodTap = waitForSecondTap
+                    handler.postDelayed(waitForSecondTap, 320L)
+                }
             }
         }
         val clockStack = LinearLayout(this).apply {
@@ -311,7 +321,7 @@ class PhantomLockActivity : Activity() {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 dp(28),
                 Gravity.BOTTOM
-            ).apply { bottomMargin = dp(48) }
+            ).apply { bottomMargin = dp(8) }
         )
 
         // Use the same fingerprint artwork, one-second hold and biometric
@@ -366,7 +376,7 @@ class PhantomLockActivity : Activity() {
         fingerprintView = aodFingerprint
         aodSensorStack.addView(
             aodFingerprint,
-            LinearLayout.LayoutParams(dp(38), dp(38))
+            LinearLayout.LayoutParams(dp(48), dp(48))
         )
         fingerprintHint = TextView(this).apply {
             text = ""
@@ -527,7 +537,7 @@ class PhantomLockActivity : Activity() {
         mediaArtwork = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
             background = GradientDrawable().apply {
-                cornerRadius = dp(16).toFloat()
+                cornerRadius = dp(13).toFloat()
                 setColor(0xFF242A35.toInt())
             }
             clipToOutline = true
@@ -535,14 +545,14 @@ class PhantomLockActivity : Activity() {
         }
         mediaMainRow.addView(
             mediaArtwork,
-            LinearLayout.LayoutParams(dp(74), dp(74)).apply { marginEnd = dp(15) }
+            LinearLayout.LayoutParams(dp(62), dp(62)).apply { marginEnd = dp(13) }
         )
         val mediaTextColumn = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
         }
         mediaTitle = TextView(this).apply {
-            textSize = 15f
+            textSize = 16f
             setTextColor(0xFFFFF9F0.toInt())
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             includeFontPadding = false
@@ -550,7 +560,7 @@ class PhantomLockActivity : Activity() {
             ellipsize = android.text.TextUtils.TruncateAt.END
         }
         mediaSubtitle = TextView(this).apply {
-            textSize = 12f
+            textSize = 11f
             setTextColor(0xFFC4BBAF.toInt())
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
             includeFontPadding = false
@@ -561,68 +571,70 @@ class PhantomLockActivity : Activity() {
             mediaTitle,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(25)
+                dp(23)
             )
         )
         mediaTextColumn.addView(
             mediaSubtitle,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(22)
+                dp(19)
             )
         )
         mediaMainRow.addView(
             mediaTextColumn,
-            LinearLayout.LayoutParams(0, dp(70), 1f)
+            LinearLayout.LayoutParams(0, dp(62), 1f)
         )
         mediaContainer.addView(
             mediaMainRow,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(80)
-            ).apply { topMargin = dp(5) }
+                dp(66)
+            )
         )
 
         val mediaControls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(7), 0, 0)
+            setPadding(0, dp(8), 0, 0)
         }
-        mediaPrevious = mediaControl("‹", "Previous track") {
+        mediaPrevious = mediaControl("⏮", "Previous track") {
             sendMusicCommand(LocalMusicPlaybackService.ACTION_PREVIOUS)
         }
         mediaPlayPause = mediaControl("▶", "Play or pause") {
             sendMusicCommand(LocalMusicPlaybackService.ACTION_TOGGLE)
         }
-        mediaNext = mediaControl("›", "Next track") {
+        mediaNext = mediaControl("⏭", "Next track") {
             sendMusicCommand(LocalMusicPlaybackService.ACTION_NEXT)
         }
-        mediaControls.addView(mediaPrevious, LinearLayout.LayoutParams(dp(44), dp(44)))
-        mediaControls.addView(mediaPlayPause, LinearLayout.LayoutParams(dp(52), dp(46)))
-        mediaControls.addView(mediaNext, LinearLayout.LayoutParams(dp(44), dp(44)))
+        mediaControls.addView(mediaPrevious, LinearLayout.LayoutParams(dp(42), dp(42)))
+        mediaControls.addView(mediaPlayPause, LinearLayout.LayoutParams(dp(48), dp(48)).apply {
+            marginStart = dp(7)
+            marginEnd = dp(7)
+        })
+        mediaControls.addView(mediaNext, LinearLayout.LayoutParams(dp(42), dp(42)))
         mediaControls.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         mediaContainer.addView(
             mediaControls,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                dp(54)
+                dp(50)
             )
         )
 
         mediaChoose = TextView(this).apply {
             text = "CHANGE MUSIC"
-            textSize = 8f
-            letterSpacing = 0.12f
+            textSize = 9f
+            letterSpacing = 0.08f
             setTextColor(0xFFE4C49A.toInt())
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             includeFontPadding = false
-            setPadding(dp(13), dp(9), dp(13), dp(9))
+            setPadding(dp(10), dp(7), dp(10), dp(7))
             gravity = Gravity.CENTER_VERTICAL or Gravity.CENTER_HORIZONTAL
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                cornerRadius = dp(12).toFloat()
-                setColor(0x1FE4C49A)
-                setStroke(dp(1), 0x35E4C49A)
+                cornerRadius = dp(10).toFloat()
+                setColor(Color.TRANSPARENT)
             }
             isClickable = true
             isFocusable = true
@@ -632,9 +644,12 @@ class PhantomLockActivity : Activity() {
         mediaContainer.addView(
             mediaChoose,
             LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(34)
-            ).apply { topMargin = dp(5) }
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dp(30)
+            ).apply {
+                topMargin = dp(2)
+                gravity = Gravity.END
+            }
         )
         contentStack.addView(
             mediaContainer,
@@ -721,7 +736,7 @@ class PhantomLockActivity : Activity() {
         fingerprintView = fingerprint
         sensorStack.addView(
             fingerprint,
-            LinearLayout.LayoutParams(dp(38), dp(38))
+            LinearLayout.LayoutParams(dp(48), dp(48))
         )
 
         fingerprintHint = TextView(this).apply {
