@@ -4,12 +4,12 @@ Phantom is evolving from a lockscreen utility into a standalone Android Home exp
 
 ## Home launcher foundation
 
-- `PhantomHomeActivity` is a dedicated Android Home activity, registered with `MAIN`, `HOME`, and `DEFAULT` intent categories.
-- The launcher is separate from `MainActivity` (setup and settings) and `PhantomLockActivity` (the existing lock surface).
-- The Home screen reuses the user's selected Phantom wallpaper, uses the bundled STIX Two Text family, and provides a searchable app drawer that launches installed apps.
+- `com.oneuihomeclone.OneUiLauncherActivity` is now Phantom's actual Android Home activity, using the Compose launcher foundation from [One UI Home Clone](https://github.com/SysAdminDoc/one-ui-home-clone).
+- The imported launcher supplies multi-page Home, app drawer/Finder, folders, widget hosting and setup, launcher preferences, local layout persistence, and recovery tooling.
+- Phantom keeps its own application ID, setup/settings activity, lockscreen activity, protection services, and music/camera shortcuts.
 - Select Phantom from **Settings → Apps → Default apps → Home app**, or use the setup button in Phantom's app screen.
 - Samsung's status bar, navigation system, notification shade, and Android settings remain system-owned. Phantom does not pretend to replace privileged Samsung firmware components.
-- The current launcher foundation is intentionally lightweight. Custom control centre, notification presentation, ambient display, and edge-lighting modules are separate follow-up work; each will be implemented only within Android's available permissions and hardware capabilities.
+- The imported launcher is an independent One UI-inspired project, not Samsung's proprietary launcher. Matching the supplied Samsung One UI reference more closely, replacing the system Quick Panel, and building any additional system-level surfaces remain separate work within Android's available permissions and hardware capabilities.
 
 ## Lock-screen experience
 

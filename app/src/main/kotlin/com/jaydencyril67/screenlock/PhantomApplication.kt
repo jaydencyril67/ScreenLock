@@ -1,13 +1,16 @@
 package com.jaydencyril67.screenlock
 
-import android.app.Application
 import androidx.appcompat.app.AppCompatDelegate
+import com.oneuihomeclone.LauncherApp
 
 /**
- * Phantom uses the dark One UI theme throughout the app.
- * The lockscreen keeps its separate custom theme on its own Activity and overlay context.
+ * Phantom's process-wide Application.
+ *
+ * It extends the imported launcher's Application foundation so the same process owns
+ * the AppWidgetHost, widget request callbacks and crash-recovery diagnostics while
+ * retaining Phantom's existing dark One UI configuration.
  */
-class PhantomApplication : Application() {
+class PhantomApplication : LauncherApp() {
     override fun onCreate() {
         super.onCreate()
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
