@@ -233,47 +233,46 @@ class PhantomWidgetHost(
 
     private fun createEmptyState(): View {
         return LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(18), dp(17), dp(18), dp(17))
-            background = roundedBackground(0x24FFFFFF, 0x42FFFFFF, 23)
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(8), dp(15), dp(8))
+            background = roundedBackground(0x28FFFFFF, 0x38FFFFFF, 22)
+            minimumHeight = dp(54)
 
             addView(TextView(activity).apply {
                 text = "+"
-                textSize = 27f
+                textSize = 24f
                 gravity = Gravity.CENTER
                 setTextColor(Color.WHITE)
                 includeFontPadding = false
-            }, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(31)
-            ))
+            }, LinearLayout.LayoutParams(dp(31), dp(36)))
 
             addView(TextView(activity).apply {
-                text = "Add your widgets"
-                textSize = 14f
-                gravity = Gravity.CENTER
+                text = "Add widgets"
+                textSize = 13f
+                gravity = Gravity.CENTER_VERTICAL
                 setTextColor(Color.WHITE)
                 typeface = android.graphics.Typeface.create(
-                    android.graphics.Typeface.DEFAULT,
-                    android.graphics.Typeface.BOLD
+                    "sans-serif",
+                    android.graphics.Typeface.MEDIUM
                 )
-            })
+                setPadding(dp(8), 0, 0, 0)
+            }, LinearLayout.LayoutParams(0, dp(36), 1f))
 
             addView(TextView(activity).apply {
-                text = "Weather, calendar, music and more"
-                textSize = 11f
+                text = "›"
+                textSize = 25f
                 gravity = Gravity.CENTER
-                setTextColor(0xD0FFFFFF.toInt())
-                setPadding(0, dp(4), 0, 0)
-            })
+                setTextColor(0xCCFFFFFF.toInt())
+                includeFontPadding = false
+            }, LinearLayout.LayoutParams(dp(22), dp(36)))
         }.apply {
             isClickable = true
             isFocusable = true
+            contentDescription = "Add a home screen widget"
             setOnClickListener { addWidget() }
         }
     }
-
     private fun savedWidgetIds(): List<Int> =
         preferences.getStringSet(KEY_WIDGET_IDS, emptySet())
             .orEmpty()
