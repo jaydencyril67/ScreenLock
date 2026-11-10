@@ -1,0 +1,271 @@
+name: Build Production Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_apk:
+        description: "Build, sign, publish, and sync the next Phantom Lock release"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+  actions: read
+
+concurrency:
+  group: phantom-lock-production-release
+  cancel-in-progress: false
+
+jobs:
+  build-release:
+    if: ${{ inputs.build_apk == true }}
+    name: Build and publish signed production APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out Phantom Lock
+        uses: actions/checkout@v4
+
+      - name: Calculate next Phantom Lock release version
+        id: version
+        env:
+          GH_TOKEN: ${ github.token }
+        run: |
+          set -euo pipefail
+          gh release list --limit 1000 --json tagName,isDraft,isPrerelease > releases.json
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          releases = json.loads(Path("releases.json").read_text())
+          versions = []
+          for release in releases:
+              if release.get("isDraft") or release.get("isPrerelease"):
+                  continue
+              tag = release.get("tagName", "")
+              match = re.fullmatch(r"v?([0-9]+)[.]([0-9]+)[.]([0-9]+)", tag)
+              if match:
+                  versions.append((tuple(map(int, match.groups())), tag))
+
+          if not versions:
+              next_version = (1, 0, 0)
+              previous_tag = ""
+          else:
+              latest_version, previous_tag = max(versions, key=lambda item: item[0])
+              major, minor, patch = latest_version
+              if patch < 9:
+                  patch += 1
+              else:
+                  patch = 0
+                  if minor < 9:
+                      minor += 1
+                  else:
+                      minor = 0
+                      major += 1
+              next_version = (major, minor, patch)
+
+          version = ".".join(map(str, next_version))
+          major, minor, patch = next_version
+          # Keep versionCode strictly increasing across workflow-file changes
+          # and older releases that used GitHub's per-workflow run_number.
+          version_code = major * 1000000 + minor * 10000 + patch * 100 + 1
+          if version_code < 1 or version_code > 2100000000:
+              raise SystemExit("Calculated Android versionCode is outside the supported range.")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write("app_version=" + version + chr(10))
+              output.write("version_code=" + str(version_code) + chr(10))
+              output.write("previous_tag=" + previous_tag + chr(10))
+
+          print("Next Phantom Lock release version: " + version)
+          print("Android versionCode: " + str(version_code))
+          print("Previous stable release: " + (previous_tag or "none"))
+          PY
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+
+      - name: Set Phantom Lock Android version
+        env:
+          APP_VERSION: ${ steps.version.outputs.app_version }
+          APP_VERSION_CODE: ${ steps.version.outputs.version_code }
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          import re
+
+          path = Path("app/build.gradle.kts")
+          source = path.read_text()
+          version = os.environ["APP_VERSION"]
+          version_code = os.environ["APP_VERSION_CODE"]
+
+          source, code_count = re.subn(
+              r"(?m)^(\\s*)versionCode\\s*=\\s*[0-9]+\\s*$",
+              lambda match: match.group(1) + "versionCode = " + version_code,
+              source,
+              count=1,
+          )
+          source, name_count = re.subn(
+              r'(?m)^(\\s*)versionName\\s*=\\s*"[^"]*"\\s*$',
+              lambda match: match.group(1) + 'versionName = "' + version + '"',
+              source,
+              count=1,
+          )
+          if code_count != 1 or name_count != 1:
+              raise SystemExit("Could not safely set Phantom Lock versionCode and versionName.")
+
+          path.write_text(source)
+          print("Configured Phantom Lock " + version + " (versionCode " + version_code + ")")
+          PY
+
+      - name: Prepare the existing permanent release signing key
+        env:
+          GH_TOKEN: ${ github.token }
+          KEYSTORE_PASSWORD: ${ secrets.PHANTOM_KEYSTORE_PASSWORD }
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::The PHANTOM_KEYSTORE_PASSWORD repository Actions secret is missing."
+            exit 1
+          fi
+
+          mkdir -p signing
+          run_id="$(gh run list --workflow generate-release-keystore.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId')"
+          if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
+            echo "::error::No successful Phantom Lock signing-key generation run was found."
+            echo "::error::Run Generate Phantom Lock Release Keystore before publishing."
+            exit 1
+          fi
+
+          gh run download "$run_id" --name phantom-lock-release-signing-files --dir signing
+          test -s signing/phantom-lock-release.keystore
+          cp signing/phantom-lock-release.keystore app/phantom-lock-release.keystore
+          keytool -list -keystore app/phantom-lock-release.keystore -storepass "$KEYSTORE_PASSWORD" -alias phantomlock >/dev/null
+
+          {
+            echo "PHANTOM_KEYSTORE_FILE=phantom-lock-release.keystore"
+            echo "PHANTOM_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "PHANTOM_KEY_ALIAS=phantomlock"
+            echo "PHANTOM_KEY_PASSWORD=$KEYSTORE_PASSWORD"
+          } >> gradle.properties
+
+      - name: Build signed Phantom Lock sideload release
+        run: gradle --no-daemon --stacktrace :app:assembleSideloadRelease
+
+      - name: Verify APK and preserve the existing signing identity
+        env:
+          GH_TOKEN: ${ github.token }
+          PREVIOUS_TAG: ${ steps.version.outputs.previous_tag }
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/sideload/release/app-sideload-release.apk"
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+
+          if [ -n "$PREVIOUS_TAG" ]; then
+            mkdir -p previous-release
+            gh release download "$PREVIOUS_TAG" --pattern "*.apk" --dir previous-release
+            PREVIOUS_APK="$(find previous-release -maxdepth 1 -type f -name '*.apk' -print -quit)"
+            if [ -z "$PREVIOUS_APK" ]; then
+              echo "::error::Could not find the previous production APK to verify signing continuity."
+              exit 1
+            fi
+
+            current_digest="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" | awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print $2; exit}')"
+            previous_digest="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$PREVIOUS_APK" | awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print $2; exit}')"
+            if [ -z "$current_digest" ] || [ "$current_digest" != "$previous_digest" ]; then
+              echo "::error::The release APK signing certificate does not match the previous production release."
+              exit 1
+            fi
+            echo "Production signing certificate matches $PREVIOUS_TAG."
+          fi
+
+          cp "$APK" PhantomLock.apk
+          ls -lh PhantomLock.apk
+
+      - name: Save production APK as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhantomLock-production-APK
+          path: PhantomLock.apk
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Publish Phantom Lock GitHub Release
+        id: publish_release
+        env:
+          GH_TOKEN: ${ github.token }
+          APP_VERSION: ${ steps.version.outputs.app_version }
+        run: |
+          set -euo pipefail
+          tag="v${APP_VERSION}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "::error::Release $tag already exists. Refusing to overwrite a published version."
+            exit 1
+          fi
+
+          gh release create "$tag" PhantomLock.apk \\
+            --target "$GITHUB_SHA" \\
+            --title "Phantom Lock ${APP_VERSION}" \\
+            --generate-notes
+
+      - name: Notify ApiCrownStore about the published APK release
+        if: ${{ always() && steps.publish_release.outcome == 'success' }}
+        env:
+          API_URL: ${{ vars.CROWNSTORE_API_URL || 'https://apicrownstore.kingshall.online' }}
+          APP_VERSION: ${ steps.version.outputs.app_version }
+        run: |
+          set -euo pipefail
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+            echo "::error::GitHub Actions OIDC is unavailable. Ensure this workflow has id-token: write permission."
+            exit 1
+          fi
+
+          oidc_response="$(curl --fail --silent --show-error \\
+            --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \\
+            --header "Accept: application/json" \\
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https%3A%2F%2Fapicrownstore.kingshall.online")"
+          oidc_token="$(printf '%s' "$oidc_response" | jq -er '.value')"
+          payload="$(jq -n \\
+            --arg repository "$GITHUB_REPOSITORY" \\
+            --arg tag "v$APP_VERSION" \\
+            '{action:"published",repository:{full_name:$repository},release:{tag_name:$tag,draft:false,prerelease:false}}')"
+
+          for attempt in 1 2 3 4 5; do
+            if curl --connect-timeout 15 --max-time 40 --fail-with-body --silent --show-error \\
+              --request POST "$API_URL/api/webhooks/github/release" \\
+              --header "Content-Type: application/json" \\
+              --header "X-GitHub-Event: release" \\
+              --header "X-GitHub-Delivery: $GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$GITHUB_JOB" \\
+              --header "Authorization: Bearer $oidc_token" \\
+              --data "$payload"; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 5 ]; then sleep 10; fi
+          done
+
+          echo "::error::The GitHub release exists, but ApiCrownStore synchronization failed after 5 attempts."
+          exit 1
