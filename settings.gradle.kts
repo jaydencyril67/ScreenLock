@@ -2,6 +2,15 @@ pluginManagement {
     repositories {
         google()
         mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
 
         // One UI 8 design system and its Samsung Experience Support Library (SESL) modules.
         // Credentials are supplied by GitHub Actions secrets; never store tokens in source.
@@ -35,15 +44,6 @@ pluginManagement {
                     .orElse(providers.environmentVariable("ONEUI_GH_TOKEN")).getOrElse("")
             }
         }
-        gradlePluginPortal()
-    }
-}
-
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        google()
-        mavenCentral()
     }
 }
 
