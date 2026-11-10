@@ -28,6 +28,12 @@
             android:showWhenLocked="true" />
 
         <activity
+            android:name=".EdgeLightingEditorActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
             android:name=".MainActivity"
             android:configChanges="keyboardHidden|orientation|screenSize"
             android:exported="true"
