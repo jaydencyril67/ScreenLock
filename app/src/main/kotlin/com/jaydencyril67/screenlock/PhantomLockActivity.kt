@@ -9,10 +9,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.ColorStateList
 import android.graphics.Color
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Rect
-import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.hardware.camera2.CameraManager
 import android.graphics.Typeface
