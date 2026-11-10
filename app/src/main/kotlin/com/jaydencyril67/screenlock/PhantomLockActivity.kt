@@ -9,6 +9,15 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.PathMeasure
+import android.graphics.RectF
+import android.graphics.SweepGradient
+import android.graphics.Matrix
+import android.animation.ValueAnimator
+import android.view.animation.LinearInterpolator
 import android.graphics.drawable.GradientDrawable
 import android.hardware.camera2.CameraManager
 import android.graphics.Typeface
@@ -228,20 +237,10 @@ class PhantomLockActivity : Activity() {
     private fun buildAodScreen() {
         isAodVisible = true
         val prefs = getSharedPreferences(PhantomOverlayService.PREFS, MODE_PRIVATE)
-        val dimMode = prefs.getString(
-            PhantomOverlayService.PREF_AOD_MODE,
-            PhantomOverlayService.AOD_MODE_WAKE
-        ) == PhantomOverlayService.AOD_MODE_DIM
-
-        // Both selections are real visible AOD sessions. They differ by brightness,
-        // not by whether Android is allowed to turn the screen off.
+        // Wake AOD is the only supported AOD mode and uses system brightness.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         window.attributes = window.attributes.apply {
-            screenBrightness = if (dimMode) {
-                0.05f
-            } else {
-                WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-            }
+            screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
         }
 
         val root = FrameLayout(this).apply {
@@ -254,6 +253,14 @@ class PhantomLockActivity : Activity() {
                 applyImmersiveMode()
             }
         }
+        // Draw the animated Samsung-style rainbow runner behind the AOD content.
+        root.addView(
+            PhantomEdgeLightingView(this),
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
 
         val clockStack = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -266,7 +273,7 @@ class PhantomLockActivity : Activity() {
             letterSpacing = -0.045f
             includeFontPadding = false
             gravity = Gravity.CENTER
-            setTextColor(if (dimMode) 0xFF666666.toInt() else 0xFFF1ECE3.toInt())
+            setTextColor(0xFFF1ECE3.toInt())
         }
         dateLabel = TextView(this).apply {
             textSize = 12f
@@ -275,7 +282,7 @@ class PhantomLockActivity : Activity() {
             includeFontPadding = false
             gravity = Gravity.CENTER
             setPadding(0, dp(12), 0, 0)
-            setTextColor(if (dimMode) 0xFF454545.toInt() else 0xFFB9B0A3.toInt())
+            setTextColor(0xFFB9B0A3.toInt())
         }
         clockStack.addView(
             clockLabel,
@@ -310,7 +317,7 @@ class PhantomLockActivity : Activity() {
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             gravity = Gravity.CENTER
             includeFontPadding = false
-            setTextColor(if (dimMode) 0xFF414141.toInt() else 0xFFAAA398.toInt())
+            setTextColor(0xFFAAA398.toInt())
             isClickable = true
             isFocusable = true
             contentDescription = "Tap to arm fingerprint unlock"
@@ -340,7 +347,7 @@ class PhantomLockActivity : Activity() {
             setImageResource(R.drawable.ic_s20_fingerprint)
             scaleType = ImageView.ScaleType.FIT_CENTER
             imageTintList = ColorStateList.valueOf(
-                if (dimMode) 0xFF555555.toInt() else 0xFFE9E3D9.toInt()
+                0xFFE9E3D9.toInt()
             )
             isClickable = true
             isFocusable = true
@@ -386,7 +393,7 @@ class PhantomLockActivity : Activity() {
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             gravity = Gravity.CENTER
             includeFontPadding = false
-            setTextColor(if (dimMode) 0xFF444444.toInt() else 0xFFB9B0A3.toInt())
+            0xFFB9B0A3.toInt()
             setPadding(0, dp(9), 0, 0)
         }
         aodSensorStack.addView(
@@ -412,7 +419,7 @@ class PhantomLockActivity : Activity() {
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             gravity = Gravity.CENTER
             includeFontPadding = false
-            setTextColor(if (dimMode) 0xFF333333.toInt() else 0xFF777168.toInt())
+            0xFF777168.toInt()
         }
         root.addView(
             hint,
@@ -1426,5 +1433,107 @@ class PhantomLockActivity : Activity() {
             }
         }
         super.onDestroy()
+    }
+}
+
+
+/**
+ * A continuously moving multicolour light segment that follows the complete
+ * rounded-rectangle perimeter of the display, behind the AOD clock and controls.
+ */
+private class PhantomEdgeLightingView(context: Context) : View(context) {
+    private val density = resources.displayMetrics.density
+    private val perimeter = Path()
+    private val segment = Path()
+    private val measure = PathMeasure()
+    private val bounds = RectF()
+    private val shaderMatrix = Matrix()
+    private val rainbow = SweepGradient(
+        0f, 0f,
+        intArrayOf(
+            Color.RED,
+            0xFFFF8A00.toInt(),
+            Color.YELLOW,
+            Color.GREEN,
+            Color.CYAN,
+            Color.BLUE,
+            0xFFB000FF.toInt(),
+            Color.RED
+        ),
+        null
+    )
+    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+        strokeWidth = 13f * density
+        shader = rainbow
+        setShadowLayer(18f * density, 0f, 0f, Color.WHITE)
+    }
+    private val lightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+        strokeWidth = 3.2f * density
+        shader = rainbow
+    }
+    private var progress = 0f
+    private var animator: ValueAnimator? = null
+
+    init {
+        setLayerType(LAYER_TYPE_SOFTWARE, null)
+        isClickable = false
+        isFocusable = false
+        contentDescription = "Animated multicolour edge lighting"
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        animator?.cancel()
+        animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 4_200L
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = LinearInterpolator()
+            addUpdateListener {
+                progress = it.animatedValue as Float
+                invalidate()
+            }
+            start()
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        animator?.cancel()
+        animator = null
+        super.onDetachedFromWindow()
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        if (width <= 0 || height <= 0) return
+
+        val inset = 8f * density
+        bounds.set(inset, inset, width - inset, height - inset)
+        perimeter.reset()
+        perimeter.addRoundRect(bounds, 19f * density, 19f * density, Path.Direction.CW)
+        measure.setPath(perimeter, false)
+        val totalLength = measure.length
+        if (totalLength <= 0f) return
+
+        val segmentLength = totalLength * 0.19f
+        val start = progress * totalLength
+        segment.reset()
+        val end = start + segmentLength
+        if (end <= totalLength) {
+            measure.getSegment(start, end, segment, true)
+        } else {
+            measure.getSegment(start, totalLength, segment, true)
+            measure.getSegment(0f, end - totalLength, segment, true)
+        }
+
+        shaderMatrix.setRotate(progress * 360f, width / 2f, height / 2f)
+        rainbow.setLocalMatrix(shaderMatrix)
+        canvas.drawPath(segment, glowPaint)
+        canvas.drawPath(segment, lightPaint)
     }
 }
