@@ -287,7 +287,7 @@ class PhantomHomeActivity : AppCompatActivity() {
         )
 
         val settingsButton = ImageView(this).apply {
-            setImageResource(android.R.drawable.ic_menu_preferences)
+            setImageResource(dev.oneuiproject.oneui.R.drawable.ic_oui_settings_outline)
             setColorFilter(Color.WHITE)
             scaleType = ImageView.ScaleType.CENTER
             background = circleSurface(0x38FFFFFF, 0x55FFFFFF)
