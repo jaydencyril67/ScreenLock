@@ -225,7 +225,7 @@ class MainActivity : Activity() {
         root.addView(protectionButton, protectParams)
 
         val note = label(
-            "HOW IT WORKS\nWhen the display goes to sleep, Phantom prepares its full-screen lock window without turning the display back on. When you wake the phone, the prepared window is already in place over the lockscreen. A screen-on launch remains as a recovery fallback.\n\nA small padlock silently arms one fingerprint tap. An ordinary fingerprint tap displays “Fingerprint doesn't match” with haptic feedback. On phones with enrolled fingerprint hardware, Android's genuine biometric prompt is used. The Galaxy A02 has no fingerprint reader, so its armed tap is a visual unlock gesture.\n\n" +
+            "HOW IT WORKS\nDim AOD keeps the LCD awake using Android's screen-dim wake lock and applies a very low window brightness. If the power button switches the display off, Phantom brings the dim clock back. Wake AOD lets the display sleep normally, then brings the clock to the front whenever Android reports that the screen has woken. Lift-to-wake follows the phone's own settings when the device supports it.\n\nA small padlock silently arms one fingerprint tap. An ordinary fingerprint tap displays “Fingerprint doesn't match” with haptic feedback. On phones with enrolled fingerprint hardware, Android's genuine biometric prompt is used. The Galaxy A02 has no fingerprint reader, so its armed tap is a visual unlock gesture.\n\n" +
                 "LOCAL MUSIC\nChoose audio files stored on your phone. Phantom plays those selected tracks directly, with previous, play/pause and next controls. It does not need notification-listener access and does not read or display your notifications.",
             12f,
             0xFF8793AD.toInt(),
