@@ -61,11 +61,13 @@ class PhantomOverlayService : Service() {
             when (intent.action) {
                 Intent.ACTION_SCREEN_OFF -> {
                     if (isProtectionEnabled()) {
-                        // Unlock is valid only until the next screen-off event.
+                        // Never leave the custom surface attached to a sleeping display.
+                        // The next SCREEN_ON event is the only normal path that shows it.
                         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                             .putBoolean(PREF_UNLOCKED_UNTIL_SCREEN_OFF, false)
                             .apply()
-                        Log.d(TAG, "Display off: Phantom will protect the next wake")
+                        removeLockSurface()
+                        Log.d(TAG, "Display off: lock surface hidden; next wake will be protected")
                     }
                 }
 
