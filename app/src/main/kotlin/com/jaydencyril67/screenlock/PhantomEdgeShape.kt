@@ -12,6 +12,7 @@ import android.graphics.RectF
  */
 object PhantomEdgeShape {
     private const val PREF_PROFILE = "edge_lighting_custom_outline"
+    private const val PREF_THICKNESS = "edge_lighting_line_thickness_dp"
     const val POINT_COUNT = 11
 
     val pointNames = arrayOf(
@@ -72,6 +73,19 @@ object PhantomEdgeShape {
      * Keep each handle in its own part of the display so dragging cannot make
      * the perimeter cross over itself or turn into an unusable scribble.
      */
+    fun loadThickness(context: Context): Float =
+        context.getSharedPreferences(
+            PhantomOverlayService.PREFS,
+            Context.MODE_PRIVATE
+        ).getFloat(PREF_THICKNESS, 2f).coerceIn(1f, 5f)
+
+    fun saveThickness(context: Context, value: Float) {
+        context.getSharedPreferences(
+            PhantomOverlayService.PREFS,
+            Context.MODE_PRIVATE
+        ).edit().putFloat(PREF_THICKNESS, value.coerceIn(1f, 5f)).apply()
+    }
+
     fun constrainPoint(index: Int, x: Float, y: Float): Pair<Float, Float> {
         val limits = when (index) {
             0 -> floatArrayOf(0.025f, 0.46f, 0.003f, 0.14f)
