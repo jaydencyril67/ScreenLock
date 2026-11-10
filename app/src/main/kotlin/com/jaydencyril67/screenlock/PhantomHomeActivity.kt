@@ -421,7 +421,7 @@ class PhantomHomeActivity : AppCompatActivity() {
             homeAppsAdapter.submitItems(items)
         } else {
             homeAppsAdapter = LauncherTilesAdapter(
-                items = items,
+                initialItems = items,
                 iconSize = 53,
                 tileHeight = 91,
                 allowFolderCreation = true
@@ -1107,7 +1107,7 @@ class PhantomHomeActivity : AppCompatActivity() {
             roundedCorners = SeslRoundedCorner.ROUNDED_CORNER_NONE
             roundedCornersColor = 0xFF07090F.toInt()
             adapter = LauncherTilesAdapter(
-                items = apps.map { HomeItem.App(it) },
+                initialItems = apps.map { HomeItem.App(it) },
                 iconSize = 51,
                 tileHeight = 91,
                 allowFolderCreation = false
