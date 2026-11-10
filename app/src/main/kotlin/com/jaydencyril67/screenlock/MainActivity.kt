@@ -34,11 +34,13 @@ class MainActivity : Activity() {
 
     companion object {
         private const val REQUEST_WALLPAPER = 4170
+        private const val REQUEST_CAMERA_SETUP = 4171
     }
 
     private lateinit var statusTitle: TextView
     private lateinit var statusDetails: TextView
     private lateinit var overlayButton: Button
+    private lateinit var cameraPermissionButton: Button
     private lateinit var protectionButton: Button
     private lateinit var wallpaperStatus: TextView
     private lateinit var resetWallpaperButton: Button
@@ -120,6 +122,33 @@ class MainActivity : Activity() {
         overlayButton = actionButton("ALLOW DISPLAY OVER OTHER APPS", 0xFF243B63.toInt())
         overlayButton.setOnClickListener { requestOverlayPermission() }
         root.addView(overlayButton, buttonParams())
+
+        val touchPermissionNote = label(
+            "TOUCH / LOCKSCREEN ACCESS", 10f, 0xFF8296BC.toInt(), true
+        ).apply {
+            letterSpacing = 0.12f
+            setPadding(0, dp(18), 0, dp(7))
+        }
+        root.addView(touchPermissionNote)
+        root.addView(label(
+            "Android calls this “Display over other apps”. It lets Phantom place its touch-responsive lockscreen above other apps when your screen wakes. Enable it in Android Settings using the button above.",
+            12f, 0xFFAAB6CE.toInt(), false
+        ))
+
+        val cameraPermissionTitle = label(
+            "CAMERA & FLASHLIGHT", 10f, 0xFF8296BC.toInt(), true
+        ).apply {
+            letterSpacing = 0.12f
+            setPadding(0, dp(18), 0, dp(7))
+        }
+        root.addView(cameraPermissionTitle)
+        root.addView(label(
+            "Camera access is used only when you launch the lockscreen camera shortcut or switch on the flashlight. It is optional for basic lockscreen protection.",
+            12f, 0xFFAAB6CE.toInt(), false
+        ))
+        cameraPermissionButton = actionButton("ALLOW CAMERA ACCESS", 0xFF243B63.toInt())
+        cameraPermissionButton.setOnClickListener { requestCameraSetupPermission() }
+        root.addView(cameraPermissionButton, buttonParams().apply { topMargin = dp(10) })
 
         val wallpaperSection = label(
             "LOCKSCREEN WALLPAPER",
@@ -303,7 +332,14 @@ class MainActivity : Activity() {
     private fun refreshDashboard() {
         refreshWallpaperStatus()
         val overlayGranted = Settings.canDrawOverlays(this)
+        val cameraGranted = checkSelfPermission(android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED
         val enabled = prefs.getBoolean(PhantomOverlayService.PREF_ENABLED, false)
+
+        cameraPermissionButton.text = if (cameraGranted) {
+            "CAMERA ACCESS  ·  ALLOWED"
+        } else {
+            "ALLOW CAMERA ACCESS"
+        }
 
         overlayButton.text = if (overlayGranted) {
             "DISPLAY OVER OTHER APPS  ·  ALLOWED"
@@ -429,6 +465,34 @@ class MainActivity : Activity() {
             this,
             "Lockscreen wallpaper saved.",
             Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    private fun requestCameraSetupPermission() {
+        if (checkSelfPermission(android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "Camera access is already enabled.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        requestPermissions(
+            arrayOf(android.Manifest.permission.CAMERA),
+            REQUEST_CAMERA_SETUP
+        )
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != REQUEST_CAMERA_SETUP) return
+        refreshDashboard()
+        val granted = grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED
+        Toast.makeText(
+            this,
+            if (granted) "Camera access enabled. Phantom camera and flashlight shortcuts are ready."
+            else "Camera access was not enabled. You can allow it later in Phantom setup or Android App permissions.",
+            Toast.LENGTH_LONG
         ).show()
     }
 
