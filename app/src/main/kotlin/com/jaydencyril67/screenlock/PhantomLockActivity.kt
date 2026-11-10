@@ -1035,14 +1035,16 @@ class PhantomLockActivity : Activity() {
         action: () -> Unit
     ): Pair<View, ImageView> {
         val button = FrameLayout(this).apply {
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(0x70212630)
-                setStroke(dp(1), 0x66E4D2BC)
-            }
+            // Keep the shortcut directly on the lockscreen: no enclosing
+            // glass circle, card fill, or border. Retain only a subtle
+            // touch ripple around the icon.
+            background = null
             foreground = android.graphics.drawable.RippleDrawable(
-                ColorStateList.valueOf(0x44FFFFFF),
-                null,
+                ColorStateList.valueOf(0x33FFFFFF),
+                GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(Color.TRANSPARENT)
+                },
                 GradientDrawable().apply { shape = GradientDrawable.OVAL }
             )
             isClickable = true
