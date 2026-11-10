@@ -8,7 +8,7 @@ import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
+import androidx.appcompat.widget.AppCompatButton
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
@@ -154,9 +154,6 @@ class PhantomWidgetHost(
                 val widgetView = host.createView(activity, widgetId, info)
                 widgetView.setAppWidget(widgetId, info)
                 widgetView.minimumHeight = dp(info.minHeight.coerceAtLeast(112))
-                widgetView.setBackground(
-                    roundedBackground(0x20FFFFFF, 0x28FFFFFF, 24)
-                )
                 widgetView.setOnLongClickListener {
                     confirmRemove(widgetId, info)
                     true
@@ -232,44 +229,17 @@ class PhantomWidgetHost(
     }
 
     private fun createEmptyState(): View {
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(16), dp(8), dp(15), dp(8))
-            background = roundedBackground(0x28FFFFFF, 0x38FFFFFF, 22)
+        return AppCompatButton(activity).apply {
+            text = "Add widgets"
+            isAllCaps = false
+            textSize = 14f
+            minHeight = dp(54)
             minimumHeight = dp(54)
-
-            addView(TextView(activity).apply {
-                text = "+"
-                textSize = 24f
-                gravity = Gravity.CENTER
-                setTextColor(Color.WHITE)
-                includeFontPadding = false
-            }, LinearLayout.LayoutParams(dp(31), dp(36)))
-
-            addView(TextView(activity).apply {
-                text = "Add widgets"
-                textSize = 13f
-                gravity = Gravity.CENTER_VERTICAL
-                setTextColor(Color.WHITE)
-                typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
-                setPadding(dp(8), 0, 0, 0)
-            }, LinearLayout.LayoutParams(0, dp(36), 1f))
-
-            addView(TextView(activity).apply {
-                text = "›"
-                textSize = 25f
-                gravity = Gravity.CENTER
-                setTextColor(0xCCFFFFFF.toInt())
-                includeFontPadding = false
-            }, LinearLayout.LayoutParams(dp(22), dp(36)))
-        }.apply {
-            isClickable = true
-            isFocusable = true
             contentDescription = "Add a home screen widget"
             setOnClickListener { addWidget() }
         }
     }
+
     private fun savedWidgetIds(): List<Int> =
         preferences.getStringSet(KEY_WIDGET_IDS, emptySet())
             .orEmpty()
@@ -281,17 +251,6 @@ class PhantomWidgetHost(
         preferences.edit()
             .putStringSet(KEY_WIDGET_IDS, ids.map { it.toString() }.toSet())
             .apply()
-    }
-
-    private fun roundedBackground(
-        fill: Int,
-        stroke: Int,
-        radiusDp: Int
-    ) = GradientDrawable().apply {
-        shape = GradientDrawable.RECTANGLE
-        setColor(fill)
-        cornerRadius = dp(radiusDp).toFloat()
-        setStroke(dp(1), stroke)
     }
 
     private fun dp(value: Int): Int =
