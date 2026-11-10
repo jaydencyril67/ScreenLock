@@ -15,19 +15,12 @@ android {
         versionName = "1.0.0"
     }
 
-    buildFeatures {
-        buildConfig = true
-    }
+    buildFeatures { buildConfig = true }
 
     flavorDimensions += "distribution"
-
     productFlavors {
-        create("sideload") {
-            dimension = "distribution"
-        }
-        create("play") {
-            dimension = "distribution"
-        }
+        create("sideload") { dimension = "distribution" }
+        create("play") { dimension = "distribution" }
     }
 
     signingConfigs {
@@ -50,25 +43,18 @@ android {
         }
     }
 
-    // This is a sideloaded Android 11+ utility, not a Google Play submission.
-    // Keep targetSdk 30 for now and suppress only Play's expired-target lint check.
-    lint {
-        disable += "ExpiredTargetSdkVersion"
-    }
+    lint { disable += "ExpiredTargetSdkVersion" }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+    kotlinOptions { jvmTarget = "17" }
 }
 
 dependencies {
-    // One UI 8 component library. Its SESL dependencies are resolved from
-    // the authenticated GitHub Maven repositories declared in settings.gradle.kts.
+    implementation(project(":launcher-foundation"))
     implementation("io.github.tribalfs:oneui-design:0.9.4+oneui8")
     implementation("io.github.oneuiproject:icons:1.1.0")
 }
