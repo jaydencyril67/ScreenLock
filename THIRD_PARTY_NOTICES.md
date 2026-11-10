@@ -33,3 +33,16 @@ The One UI Design Library depends on modified AndroidX and Material components:
 - License: Apache License, Version 2.0
 
 These are independent community projects and are not official Samsung software or affiliated with Samsung.
+
+
+## One UI Home Clone launcher foundation
+
+Phantom incorporates launcher components from **One UI Home Clone**:
+- Source: https://github.com/SysAdminDoc/one-ui-home-clone
+- Copyright: One UI Home Clone contributors
+- License: MIT
+- The original MIT license is included at `app/src/main/assets/one-ui-home-clone-LICENSE.txt`.
+
+The imported implementation supplies the Compose-based Home surface, Apps screen/Finder, folders, widget host and picker, launcher settings, and related local persistence/recovery components. It is integrated into Phantom's existing Android application; Phantom retains its own application ID, settings entry point, lockscreen, and protection services.
+
+One UI Home Clone is an independent community project. It is not Samsung software and is not affiliated with Samsung.

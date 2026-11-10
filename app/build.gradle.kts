@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
@@ -17,6 +18,7 @@ android {
 
     buildFeatures {
         buildConfig = true
+        compose = true
     }
 
     flavorDimensions += "distribution"
@@ -50,8 +52,7 @@ android {
         }
     }
 
-    // This is a sideloaded Android 11+ utility, not a Google Play submission.
-    // Keep targetSdk 30 for now and suppress only Play's expired-target lint check.
+    // Phantom targets Android 11+; keep the existing distribution baseline.
     lint {
         disable += "ExpiredTargetSdkVersion"
     }
@@ -67,8 +68,25 @@ android {
 }
 
 dependencies {
-    // One UI 8 component library. Its SESL dependencies are resolved from
-    // the authenticated GitHub Maven repositories declared in settings.gradle.kts.
+    // Existing Phantom One UI 8 component library and SESL support.
     implementation("io.github.tribalfs:oneui-design:0.9.4+oneui8")
     implementation("io.github.oneuiproject:icons:1.1.0")
+
+    // Compose launcher foundation imported from SysAdminDoc/one-ui-home-clone (MIT).
+    implementation("androidx.core:core-ktx:1.16.0")
+    implementation("androidx.activity:activity-compose:1.10.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.2")
+    implementation("androidx.datastore:datastore-preferences:1.1.7")
+
+    implementation(platform("androidx.compose:compose-bom:2025.12.00"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.animation:animation")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
+
+    debugImplementation("androidx.compose.ui:ui-tooling")
 }

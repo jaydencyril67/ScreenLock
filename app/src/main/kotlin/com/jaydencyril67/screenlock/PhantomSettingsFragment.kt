@@ -123,7 +123,7 @@ class PhantomSettingsFragment : PreferenceFragmentCompat() {
 
         homePreference = Preference(context).apply {
             title = "Default Home app"
-            summary = "Choose Phantom as your Android Home app to use its One UI-style launcher."
+            summary = "Choose Phantom as your Android Home app to use the imported One UI launcher foundation."
             setOnPreferenceClickListener {
                 openHomeSettings()
                 true
@@ -222,11 +222,11 @@ class PhantomSettingsFragment : PreferenceFragmentCompat() {
             android.content.pm.PackageManager.MATCH_DEFAULT_ONLY
         )?.activityInfo
         val isPhantomDefault = resolved?.packageName == context.packageName &&
-            resolved.name.endsWith("PhantomHomeActivity")
+            resolved.name.endsWith("OneUiLauncherActivity")
         homePreference.summary = if (isPhantomDefault) {
-            "Phantom is currently your default Home app."
+            "Phantom One UI Home is currently your default Home app."
         } else {
-            "Samsung Home is still available. Select Phantom in Android's Home app settings to use the launcher."
+            "Samsung One UI Home remains installed. Select Phantom in Android's Home app settings to use this launcher."
         }
 
         val selectedWallpaper = lockPrefs.getString(PhantomWallpaperStore.PREF_KEY, null)
