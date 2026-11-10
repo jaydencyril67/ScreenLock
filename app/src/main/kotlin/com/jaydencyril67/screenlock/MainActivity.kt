@@ -87,11 +87,28 @@ class MainActivity : Activity() {
         }
         root.addView(title)
         root.addView(label(
-            "A full-screen S20-inspired lock screen that prepares before your display wakes.",
+            "Phantom is expanding into a complete Home experience. Choose it as your Android Home app to use the new launcher.",
             13f,
             0xFFA4AEC3.toInt(),
             false
         ))
+
+        val homeLauncherButton = actionButton("SET PHANTOM AS DEFAULT HOME", 0xFF243B63.toInt())
+        homeLauncherButton.setOnClickListener {
+            try {
+                startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+            } catch (_: Exception) {
+                Toast.makeText(
+                    this,
+                    "Open Settings > Apps > Default apps > Home app, then choose Phantom.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+        root.addView(
+            homeLauncherButton,
+            buttonParams().apply { topMargin = dp(18) }
+        )
 
         val statusCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
