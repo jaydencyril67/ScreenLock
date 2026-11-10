@@ -497,8 +497,7 @@ class PhantomLockActivity : Activity() {
                 dp(26),
                 Gravity.TOP or Gravity.START
             ).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.265f).toInt()
-                marginStart = dp(29)
+                topMargin = (resources.displayMetrics.heightPixels * 0.265f).toInt()                marginStart = dp(29)
                 marginEnd = dp(20)
             }
         )
@@ -997,8 +996,7 @@ class PhantomLockActivity : Activity() {
             android.widget.Toast.makeText(
                 this,
                 "Could not start the local music player.",
-                android.widget.Toast.LENGTH_LONG
-            ).show()
+                android.widget.Toast.LENGTH_LONG            ).show()
         }
     }
 
@@ -1460,7 +1458,7 @@ private class PhantomEdgeLightingView(context: Context) : View(context) {
         setLayerType(LAYER_TYPE_SOFTWARE, null)
         isClickable = false
         isFocusable = false
-        contentDescription = "Samsung-style animated edge lighting"
+        contentDescription = "Animated edge lighting following the display cutout"
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -1494,26 +1492,78 @@ private class PhantomEdgeLightingView(context: Context) : View(context) {
         super.onDetachedFromWindow()
     }
 
+    private fun topDisplayCutout(): Rect? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return null
+        return rootWindowInsets?.displayCutout?.boundingRects
+            ?.firstOrNull { it.top <= dp(12) && it.bottom > 0 && it.width() > 0 }
+    }
+
+    private fun dp(value: Int): Int =
+        (value * density).toInt()
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (width <= 0 || height <= 0) return
 
-        // Keep the light close to the physical display edge, with restrained
-        // corner rounding rather than a large inset neon frame.
+        // Trace the physical display perimeter, then route the top edge around
+        // Android's reported camera cutout instead of drawing straight across it.
         val inset = 2.5f * density
+        val radius = 22f * density
         bounds.set(inset, inset, width - inset, height - inset)
         perimeter.reset()
-        perimeter.addRoundRect(bounds, 22f * density, 22f * density, Path.Direction.CW)
+
+        val cutout = topDisplayCutout()
+        if (cutout != null) {
+            // DisplayCutout supplies the real notch bounds. A smooth two-sided
+            // curve follows the waterdrop/V profile inside those bounds.
+            val notchLeft = (cutout.left + inset).coerceAtLeast(bounds.left + radius)
+            val notchRight = (cutout.right - inset).coerceAtMost(bounds.right - radius)
+            val notchTop = bounds.top
+            val notchBottom = (cutout.bottom - inset).coerceAtLeast(notchTop + 1f)
+            val notchWidth = notchRight - notchLeft
+            val center = (notchLeft + notchRight) / 2f
+            val depth = notchBottom - notchTop
+
+            if (notchWidth > 0f && depth > 0f) {
+                perimeter.moveTo(bounds.left + radius, bounds.top)
+                perimeter.lineTo(notchLeft, notchTop)
+                perimeter.cubicTo(
+                    notchLeft, notchTop + depth * 0.48f,
+                    center - notchWidth * 0.20f, notchBottom,
+                    center, notchBottom
+                )
+                perimeter.cubicTo(
+                    center + notchWidth * 0.20f, notchBottom,
+                    notchRight, notchTop + depth * 0.48f,
+                    notchRight, notchTop
+                )
+                perimeter.lineTo(bounds.right - radius, bounds.top)
+                perimeter.quadTo(bounds.right, bounds.top, bounds.right, bounds.top + radius)
+                perimeter.lineTo(bounds.right, bounds.bottom - radius)
+                perimeter.quadTo(bounds.right, bounds.bottom, bounds.right - radius, bounds.bottom)
+                perimeter.lineTo(bounds.left + radius, bounds.bottom)
+                perimeter.quadTo(bounds.left, bounds.bottom, bounds.left, bounds.bottom - radius)
+                perimeter.lineTo(bounds.left, bounds.top + radius)
+                perimeter.quadTo(bounds.left, bounds.top, bounds.left + radius, bounds.top)
+                perimeter.close()
+            } else {
+                perimeter.addRoundRect(bounds, radius, radius, Path.Direction.CW)
+            }
+        } else {
+            // Keep the normal rounded perimeter on devices without a top cutout.
+            perimeter.addRoundRect(bounds, radius, radius, Path.Direction.CW)
+        }
+
         measure.setPath(perimeter, false)
         val totalLength = measure.length
         if (totalLength <= 0f) return
 
-        // The fine multicolour edge remains visible around the complete screen.
         shaderMatrix.setRotate(progress * 360f, width / 2f, height / 2f)
         rainbow?.setLocalMatrix(shaderMatrix)
         canvas.drawPath(perimeter, ambientPaint)
 
-        // A crisp travelling highlight creates the continuous racing motion.
+        // The travelling runner follows the same continuous path, including
+        // the waterdrop notch contour at the top of the display.
         val runnerLength = totalLength * 0.105f
         val start = progress * totalLength
         val end = start + runnerLength
