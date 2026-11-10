@@ -32,11 +32,11 @@ The Galaxy A02 does not have a fingerprint reader. On that device, the armed tap
 
 A persistent foreground-service notification provides an emergency **Turn off** action. Protection restores after reboot when it was previously enabled and overlay permission remains granted.
 
-## Wake and keyguard behavior
+## Always-on display behavior
 
-The earlier implementation waited for ACTION_SCREEN_ON and only then started the lock Activity. Android documents ACTION_SCREEN_ON as the point when the device has already woken and become interactive, so the native keyguard can begin appearing before an app launched in response is ready. The updated service instead starts the lock Activity on ACTION_SCREEN_OFF, when the device becomes non-interactive. In this prepare-only mode, the Activity uses showWhenLocked but explicitly does not turn the display back on. Its window and UI are created before the next wake. ACTION_SCREEN_ON remains a fallback if the prepared Activity was killed or the screen-off event was missed. Background Activity launch relies on the user-granted SYSTEM_ALERT_WINDOW permission.
+The foreground service listens for Android's screen-off event. When Phantom protection is enabled and no AOD session is already showing, it launches the dedicated lock Activity with `showWhenLocked` and `turnScreenOn`. The Activity displays the AOD immediately, uses `FLAG_KEEP_SCREEN_ON`, and applies the selected window brightness. Dim AOD uses a low brightness override; Wake AOD uses the phone's normal system brightness.
 
-Android and Samsung still control keyguard scheduling, battery restrictions and protected system surfaces. Phantom requests the earliest app-controlled launch, but it cannot replace the operating system's keyguard or guarantee a zero-frame transition on every firmware build.
+A second power-button press while AOD is showing closes the AOD and lets Android turn the panel off. When the user wakes the phone again, the service restores the interactive Phantom lockscreen. This is a software AOD: it keeps an ordinary Android Activity visible and cannot use Samsung's privileged panel-level Doze implementation. On an LCD device the backlight stays on while AOD is visible, so power use is higher than Samsung's native AMOLED AOD.
 
 ## Artwork attribution
 
