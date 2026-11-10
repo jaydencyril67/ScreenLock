@@ -53,11 +53,12 @@ class MainActivity : Activity() {
         window.statusBarColor = Color.rgb(5, 7, 15)
         window.navigationBarColor = Color.rgb(5, 7, 15)
         window.decorView.systemUiVisibility = 0
-        // Migrate any previously selected Dim AOD setting to the sole supported mode.
-        prefs.edit().putString(
-            PhantomOverlayService.PREF_AOD_MODE,
-            PhantomOverlayService.AOD_MODE_WAKE
-        ).apply()
+        // Keep the single supported AOD mode and clear settings from the removed edge-light feature.
+        prefs.edit()
+            .putString(PhantomOverlayService.PREF_AOD_MODE, PhantomOverlayService.AOD_MODE_WAKE)
+            .remove("edge_lighting_custom_outline")
+            .remove("edge_lighting_line_thickness_dp")
+            .apply()
         buildDashboard()
         PhantomTypography.apply(findViewById(android.R.id.content), this)
         showEntrySplash()
@@ -198,23 +199,11 @@ class MainActivity : Activity() {
         }
         root.addView(aodSection)
         root.addView(label(
-            "Wake AOD stays visible at your normal system brightness. A multicolour edge-light animation continuously races around all four screen edges while AOD is displayed.",
+            "Wake AOD keeps your clock and date visible at your normal system brightness. Tap the display to open the interactive lockscreen.",
             12f,
             0xFFAAB6CE.toInt(),
             false
         ))
-
-        val edgeShapeButton = actionButton(
-            "CUSTOM EDGE LIGHTING SHAPE",
-            0xFF27354A.toInt()
-        )
-        edgeShapeButton.setOnClickListener {
-            startActivity(Intent(this, EdgeLightingEditorActivity::class.java))
-        }
-        root.addView(
-            edgeShapeButton,
-            buttonParams().apply { topMargin = dp(16) }
-        )
 
         protectionButton = actionButton("ACTIVATE PHANTOM LOCK", 0xFF526ED6.toInt())
         protectionButton.setOnClickListener { toggleProtection() }
@@ -222,7 +211,7 @@ class MainActivity : Activity() {
         root.addView(protectionButton, protectParams)
 
         val note = label(
-            "HOW IT WORKS\nPhantom starts its Wake AOD Activity when Android reports that the phone has locked. The clock stays at normal system brightness while multicolour edge lighting continuously races around the full screen perimeter. Press the power button again to turn the display fully off; waking the phone returns to the interactive Phantom lockscreen. Because the Galaxy A02 uses an LCD, the backlight remains on during AOD and battery use can be significant.\n\nA small padlock silently arms one fingerprint tap. An ordinary fingerprint tap displays “Fingerprint doesn't match” with haptic feedback. On phones with enrolled fingerprint hardware, Android's genuine biometric prompt is used. The Galaxy A02 has no fingerprint reader, so its armed tap is a visual unlock gesture.\n\n" +
+            "HOW IT WORKS\nPhantom starts its Wake AOD Activity when Android reports that the phone has locked. Your clock and date remain visible at normal system brightness. Press the power button again to turn the display fully off; waking the phone returns to the interactive Phantom lockscreen. Because the Galaxy A02 uses an LCD, the backlight remains on during AOD and battery use can be significant.\n\nA small padlock silently arms one fingerprint tap. An ordinary fingerprint tap displays “Fingerprint doesn't match” with haptic feedback. On phones with enrolled fingerprint hardware, Android's genuine biometric prompt is used. The Galaxy A02 has no fingerprint reader, so its armed tap is a visual unlock gesture.\n\n" +
                 "LOCAL MUSIC\nChoose audio files stored on your phone. Phantom plays those selected tracks directly, with previous, play/pause and next controls. It does not need notification-listener access and does not read or display your notifications.",
             12f,
             0xFF8793AD.toInt(),
