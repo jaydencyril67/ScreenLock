@@ -114,10 +114,13 @@ class PhantomLockActivity : Activity() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_SCREEN_OFF -> {
-                    // Keep this Activity alive underneath the sleeping display.
-                    // Its showWhenLocked window is already prepared for the next wake.
+                    // Change the already-visible lock Activity into AOD in place.
+                    // Do not ask the background service to start another Activity here:
+                    // Android 11 can defer that launch until the next screen-on event.
                     armed = false
                     unlockPending = false
+                    buildAodScreen()
+                    applyImmersiveMode()
                     armRunnable?.let(handler::removeCallbacks)
                     armRunnable = null
                     handler.removeCallbacks(clearMismatch)
