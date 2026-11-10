@@ -1423,6 +1423,7 @@ class PhantomLockActivity : Activity() {
 private class PhantomEdgeLightingView(context: Context) : View(context) {
     private val density = resources.displayMetrics.density
     private val edgePoints = PhantomEdgeShape.load(context)
+    private val edgeThickness = PhantomEdgeShape.loadThickness(context)
     private val perimeter = Path()
     private val runner = Path()
     private val measure = PathMeasure()
@@ -1444,21 +1445,21 @@ private class PhantomEdgeLightingView(context: Context) : View(context) {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
-        strokeWidth = 1.35f * density
+        strokeWidth = 0.675f * edgeThickness * density
         alpha = 175
     }
     private val runnerGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
-        strokeWidth = 5.5f * density
+        strokeWidth = 2.75f * edgeThickness * density
         alpha = 105
     }
     private val runnerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
-        strokeWidth = 1.9f * density
+        strokeWidth = 0.95f * edgeThickness * density
     }
 
     private var progress = 0f
