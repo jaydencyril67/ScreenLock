@@ -1,6 +1,5 @@
 package com.jaydencyril67.screenlock
 
-import android.app.Activity
 import android.content.Intent
 import android.content.pm.ResolveInfo
 import android.graphics.Color
@@ -10,22 +9,20 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.text.Editable
-import android.text.InputType
-import android.text.TextWatcher
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.GestureDetector
-import android.view.inputmethod.EditorInfo
-import android.widget.EditText
+import android.widget.AutoCompleteTextView
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.ViewFlipper
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SearchView
 import java.text.Collator
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -39,7 +36,7 @@ import kotlin.math.abs
  * a four-column home grid, a restrained dock, and a horizontally paged app
  * drawer. It remains an independent launcher and does not own Phantom's lock.
  */
-class PhantomHomeActivity : Activity() {
+class PhantomHomeActivity : AppCompatActivity() {
 
     private data class LauncherApp(
         val packageName: String,
@@ -60,7 +57,6 @@ class PhantomHomeActivity : Activity() {
     private var drawerOverlay: FrameLayout? = null
     private var drawerPageFlipper: ViewFlipper? = null
     private var drawerPageDots: LinearLayout? = null
-    private var drawerSearch: EditText? = null
     private var drawerGestureDetector: GestureDetector? = null
     private var drawerPageCount = 0
     private var drawerCurrentPage = 0
@@ -569,46 +565,35 @@ class PhantomHomeActivity : Activity() {
             }
         )
 
-        val searchBar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(15), 0, dp(14), 0)
+        // SESL AppCompat SearchView receives its One UI styling from PhantomOneUITheme.
+        val searchSurface = FrameLayout(this).apply {
             background = glassSurface(0xFFF1F2F5.toInt(), 0xFFFFFFFF.toInt(), 25f)
+            clipToOutline = true
         }
-        searchBar.addView(
-            text("⌕", 25f, 0xFF555B67.toInt(), false).apply {
-                gravity = Gravity.CENTER
-            },
-            LinearLayout.LayoutParams(dp(30), dp(49))
-        )
-
-        val search = EditText(this).apply {
-            hint = "Search"
+        val search = SearchView(this).apply {
+            isIconifiedByDefault = false
+            isIconified = false
+            queryHint = "Search apps"
+            maxWidth = Int.MAX_VALUE
+            setSubmitButtonEnabled(false)
+            setBackgroundColor(Color.TRANSPARENT)
+        }
+        search.findViewById<AutoCompleteTextView>(androidx.appcompat.R.id.search_src_text)?.apply {
             setHintTextColor(0xFF747A86.toInt())
             setTextColor(0xFF20232B.toInt())
             textSize = 14f
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-            inputType = InputType.TYPE_CLASS_TEXT
-            imeOptions = EditorInfo.IME_ACTION_SEARCH
-            setSingleLine(true)
-            background = null
-            setPadding(dp(7), 0, dp(7), 0)
             includeFontPadding = false
         }
-        searchBar.addView(
+        searchSurface.addView(
             search,
-            LinearLayout.LayoutParams(0, dp(49), 1f)
-        )
-        searchBar.addView(
-            text("×", 23f, 0xFF6C727E.toInt(), false).apply {
-                gravity = Gravity.CENTER
-                isClickable = true
-                setOnClickListener { search.text.clear() }
-            },
-            LinearLayout.LayoutParams(dp(28), dp(49))
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(49)
+            )
         )
         drawer.addView(
-            searchBar,
+            searchSurface,
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(49)
@@ -633,7 +618,6 @@ class PhantomHomeActivity : Activity() {
         drawerOverlay = overlay
         drawerPageFlipper = pageFlipper
         drawerPageDots = dots
-        drawerSearch = search
 
         drawerGestureDetector = GestureDetector(
             this,
@@ -662,30 +646,34 @@ class PhantomHomeActivity : Activity() {
         )
 
         renderDrawerApps(launchableApps)
-        search.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+        search.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean = false
 
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val queryText = s?.toString().orEmpty().trim()
+            override fun onQueryTextChange(newText: String?): Boolean {
+                val queryText = newText.orEmpty().trim()
                 val filtered = if (queryText.isEmpty()) {
                     launchableApps
                 } else {
                     launchableApps.filter { it.label.contains(queryText, ignoreCase = true) }
                 }
                 renderDrawerApps(filtered)
+                return true
             }
-
-            override fun afterTextChanged(s: Editable?) = Unit
         })
 
         overlay.alpha = 0f
         overlay.animate().alpha(1f).setDuration(150L).start()
 
         if (focusSearch) {
+            val queryField = search.findViewById<AutoCompleteTextView>(androidx.appcompat.R.id.search_src_text)
             search.requestFocus()
+            queryField?.requestFocus()
             search.post {
                 val inputMethod = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-                inputMethod.showSoftInput(search, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                inputMethod.showSoftInput(
+                    queryField ?: search,
+                    android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT
+                )
             }
         }
     }
@@ -821,7 +809,6 @@ class PhantomHomeActivity : Activity() {
         drawerOverlay = null
         drawerPageFlipper = null
         drawerPageDots = null
-        drawerSearch = null
         drawerGestureDetector = null
         drawerPageCount = 0
         drawerCurrentPage = 0
