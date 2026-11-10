@@ -196,7 +196,7 @@ class MainActivity : Activity() {
         }
         root.addView(aodSection)
         root.addView(label(
-            "Choose how Phantom presents its clock when you wake the phone. Dim AOD keeps the clock faintly visible and holds the display awake; Wake AOD lets the screen sleep normally.",
+            "Choose how Phantom keeps its clock visible after you lock the phone. Dim AOD uses very low brightness. Wake AOD uses your normal system brightness. Both keep the AOD visible until you press the power button again or open the lockscreen.",
             12f,
             0xFFAAB6CE.toInt(),
             false
@@ -210,7 +210,7 @@ class MainActivity : Activity() {
         }
         root.addView(aodDimButton, buttonParams().apply { topMargin = dp(12) })
 
-        aodWakeButton = actionButton("WAKE AOD  ·  NORMAL SLEEP", 0xFF27354A.toInt())
+        aodWakeButton = actionButton("WAKE AOD  ·  SYSTEM BRIGHTNESS", 0xFF27354A.toInt())
         aodWakeButton.setOnClickListener {
             prefs.edit().putString(PhantomOverlayService.PREF_AOD_MODE, PhantomOverlayService.AOD_MODE_WAKE).apply()
             notifyAodModeChanged()
@@ -225,7 +225,7 @@ class MainActivity : Activity() {
         root.addView(protectionButton, protectParams)
 
         val note = label(
-            "HOW IT WORKS\nDim AOD keeps the LCD awake using Android's screen-dim wake lock and applies a very low window brightness. If the power button switches the display off, Phantom brings the dim clock back. Wake AOD lets the display sleep normally, then brings the clock to the front whenever Android reports that the screen has woken. Lift-to-wake follows the phone's own settings when the device supports it.\n\nA small padlock silently arms one fingerprint tap. An ordinary fingerprint tap displays “Fingerprint doesn't match” with haptic feedback. On phones with enrolled fingerprint hardware, Android's genuine biometric prompt is used. The Galaxy A02 has no fingerprint reader, so its armed tap is a visual unlock gesture.\n\n" +
+            "HOW IT WORKS\nPhantom starts its AOD Activity when Android reports that the phone has locked. Dim AOD uses very low brightness; Wake AOD uses the phone's normal system brightness. Both keep the AOD visible while the session is active. Press the power button again to turn the display fully off; waking the phone returns to the interactive Phantom lockscreen. Because the Galaxy A02 uses an LCD, the backlight remains on during AOD and battery use can be significant.\n\nA small padlock silently arms one fingerprint tap. An ordinary fingerprint tap displays “Fingerprint doesn't match” with haptic feedback. On phones with enrolled fingerprint hardware, Android's genuine biometric prompt is used. The Galaxy A02 has no fingerprint reader, so its armed tap is a visual unlock gesture.\n\n" +
                 "LOCAL MUSIC\nChoose audio files stored on your phone. Phantom plays those selected tracks directly, with previous, play/pause and next controls. It does not need notification-listener access and does not read or display your notifications.",
             12f,
             0xFF8793AD.toInt(),
