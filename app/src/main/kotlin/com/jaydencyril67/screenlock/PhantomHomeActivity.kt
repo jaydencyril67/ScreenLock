@@ -429,7 +429,7 @@ class PhantomHomeActivity : Activity() {
                     maxLines = 1
                     ellipsize = android.text.TextUtils.TruncateAt.END
                     setPadding(dp(2), dp(5), dp(2), 0)
-                    shadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
+                    setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
                 },
                 LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
