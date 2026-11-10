@@ -506,7 +506,7 @@ class PhantomLockActivity : Activity() {
                                 }
                             }
                             fingerprintHoldRunnable = hold
-                            handler.postDelayed(hold, 350L)
+                            handler.postDelayed(hold, 1_000L)
                         }
                         true
                     }
@@ -913,18 +913,19 @@ class PhantomLockActivity : Activity() {
     }
 
     private fun armFingerprint() {
-        // Battery percentage is the discreet arming target; no lock icon is shown.
-        armed = false
+        // Battery tap arms the fingerprint immediately; the only detection timer
+        // is the one-second continuous press-and-hold on the fingerprint.
         armRunnable?.let(handler::removeCallbacks)
-        val pendingArm = Runnable {
-            armed = true
-            if (::fingerprintHint.isInitialized) {
-                fingerprintHint.text = "PRESS & HOLD TO UNLOCK"
-                fingerprintHint.setTextColor(0xFFE3DCD1.toInt())
-            }
+        armRunnable = null
+        armed = true
+        unlockPending = false
+        handler.removeCallbacks(clearMismatch)
+
+        if (::fingerprintHint.isInitialized) {
+            fingerprintHint.text = "PRESS & HOLD FOR 1 SECOND"
+            fingerprintHint.setTextColor(0xFFE3DCD1.toInt())
+            fingerprintHint.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
         }
-        armRunnable = pendingArm
-        handler.postDelayed(pendingArm, 180L)
     }
 
     private fun onFingerprintPressed() {
@@ -935,50 +936,34 @@ class PhantomLockActivity : Activity() {
             return
         }
 
-        // One-use arming. A short verification beat prevents an instant dismissal.
+        // This method is called by the one-second hold timer while the finger
+        // is still physically down. No ACTION_UP/release is needed.
         armed = false
         armRunnable?.let(handler::removeCallbacks)
         armRunnable = null
         handler.removeCallbacks(clearMismatch)
         unlockPending = true
-        fingerprintHint.text = "VERIFYING ACCESS"
-        fingerprintHint.setTextColor(0xFFE1F4FF.toInt())
 
-        fingerprintView?.animate()
-            ?.alpha(0.72f)
-            ?.scaleX(0.94f)
-            ?.scaleY(0.94f)
-            ?.setDuration(150L)
-            ?.withEndAction {
-                fingerprintView?.animate()
-                    ?.alpha(1f)
-                    ?.scaleX(1f)
-                    ?.scaleY(1f)
-                    ?.setDuration(180L)
-                    ?.start()
-            }
-            ?.start()
+        if (::fingerprintHint.isInitialized) {
+            fingerprintHint.text = "VERIFYING ACCESS"
+            fingerprintHint.setTextColor(0xFFE1F4FF.toInt())
+        }
 
-        handler.postDelayed({
-            if (isFinishing || isDestroyed) return@postDelayed
+        val biometricManager = getSystemService(BIOMETRIC_SERVICE) as BiometricManager
+        val availability = biometricManager.canAuthenticate(
+            BiometricManager.Authenticators.BIOMETRIC_STRONG
+        )
+
+        if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
+            // Devices without a supported fingerprint reader use the existing
+            // visual-unlock fallback immediately at the one-second threshold.
             unlockPending = false
-            fingerprintHint.text = "TOUCH TO UNLOCK"
-            fingerprintHint.setTextColor(0xC9DCE9F8.toInt())
+            finish()
+            return
+        }
 
-            val biometricManager = getSystemService(BIOMETRIC_SERVICE) as BiometricManager
-            val availability = biometricManager.canAuthenticate(
-                BiometricManager.Authenticators.BIOMETRIC_STRONG
-            )
-
-            if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
-                // The Galaxy A02 has no fingerprint reader. Keep its agreed visual
-                // unlock fallback rather than requiring a system PIN or password.
-                finish()
-                return@postDelayed
-            }
-
-            startBiometricPrompt()
-        }, 470L)
+        unlockPending = false
+        startBiometricPrompt()
     }
 
     private fun startBiometricPrompt() {
