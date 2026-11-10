@@ -11,14 +11,8 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.PathMeasure
 import android.graphics.Rect
 import android.graphics.RectF
-import android.graphics.SweepGradient
-import android.graphics.Matrix
-import android.animation.ValueAnimator
-import android.view.animation.LinearInterpolator
 import android.graphics.drawable.GradientDrawable
 import android.hardware.camera2.CameraManager
 import android.graphics.Typeface
@@ -101,9 +95,9 @@ class PhantomLockActivity : Activity() {
         override fun run() {
             if (::clockLabel.isInitialized) {
                 val now = Date()
-                clockLabel.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(now)
+                clockLabel.text = formatClockTime(now)
                 dateLabel.text = SimpleDateFormat(
-                    "EEEE  ·  d MMMM yyyy",
+                    "EEEE, d MMMM",
                     Locale.getDefault()
                 ).format(now).uppercase(Locale.getDefault())
             }
@@ -252,49 +246,40 @@ class PhantomLockActivity : Activity() {
                 applyImmersiveMode()
             }
         }
-        // Draw the animated Samsung-style rainbow runner behind the AOD content.
-        root.addView(
-            PhantomEdgeLightingView(this),
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-        )
-
         val clockStack = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             isClickable = false
         }
         clockLabel = TextView(this).apply {
-            textSize = 72f
-            typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
-            letterSpacing = -0.045f
+            textSize = 78f
+            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+            letterSpacing = -0.035f
             includeFontPadding = false
             gravity = Gravity.CENTER
-            setTextColor(0xFFF1ECE3.toInt())
+            setTextColor(0xFFF4F0E9.toInt())
         }
         dateLabel = TextView(this).apply {
-            textSize = 12f
-            letterSpacing = 0.16f
+            textSize = 11f
+            letterSpacing = 0.12f
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             includeFontPadding = false
             gravity = Gravity.CENTER
-            setPadding(0, dp(12), 0, 0)
-            setTextColor(0xFFB9B0A3.toInt())
+            setPadding(0, dp(8), 0, 0)
+            setTextColor(0xFFC8C0B4.toInt())
         }
         clockStack.addView(
             clockLabel,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(104)
+                dp(100)
             )
         )
         clockStack.addView(
             dateLabel,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(34)
+                dp(30)
             )
         )
         root.addView(
@@ -304,8 +289,8 @@ class PhantomLockActivity : Activity() {
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.TOP or Gravity.CENTER_HORIZONTAL
             ).apply {
-                // Position the modern clock in the upper third, not screen-centred.
-                topMargin = (resources.displayMetrics.heightPixels * 0.20f).toInt()
+                // Keep the clock/date group in the upper third, not screen-centred.
+                topMargin = (resources.displayMetrics.heightPixels * 0.18f).toInt()
                 leftMargin = dp(20)
                 rightMargin = dp(20)
             }
@@ -461,13 +446,13 @@ class PhantomLockActivity : Activity() {
         )
 
         clockLabel = TextView(this).apply {
-            text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-            textSize = 78f
+            text = formatClockTime(Date())
+            textSize = 76f
             setTextColor(0xFFF7F2E9.toInt())
-            typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
+            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
             gravity = Gravity.START or Gravity.CENTER_VERTICAL
             includeFontPadding = false
-            letterSpacing = -0.055f
+            letterSpacing = -0.04f
             setShadowLayer(dp(20).toFloat(), 0f, dp(4).toFloat(), 0x885D3925.toInt())
         }
         root.addView(
@@ -501,37 +486,6 @@ class PhantomLockActivity : Activity() {
                 topMargin = (resources.displayMetrics.heightPixels * 0.265f).toInt()
                 marginStart = dp(29)
                 marginEnd = dp(20)
-            }
-        )
-
-        val dateRule = View(this).apply {
-            setBackgroundColor(0x90D1B38A.toInt())
-        }
-        root.addView(
-            dateRule,
-            FrameLayout.LayoutParams(dp(62), dp(1), Gravity.TOP or Gravity.START).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.305f).toInt()
-                marginStart = dp(30)
-            }
-        )
-
-        val dateCaption = TextView(this).apply {
-            text = "LOCAL TIME  ·  24-HOUR FORMAT"
-            textSize = 8f
-            letterSpacing = 0.18f
-            setTextColor(0xAFCFC6B8.toInt())
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            includeFontPadding = false
-        }
-        root.addView(
-            dateCaption,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                dp(20),
-                Gravity.TOP or Gravity.START
-            ).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.322f).toInt()
-                marginStart = dp(30)
             }
         )
 
@@ -1305,9 +1259,20 @@ class PhantomLockActivity : Activity() {
         }
     }
 
+    private fun formatClockTime(date: Date): String {
+        val pattern = if (android.text.format.DateFormat.is24HourFormat(this)) {
+            "HH:mm"
+        } else {
+            "h:mm a"
+        }
+        return SimpleDateFormat(pattern, Locale.getDefault())
+            .format(date)
+            .uppercase(Locale.getDefault())
+    }
+
     private fun updateClock() {
         val now = Date()
-        clockLabel.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(now)
+        clockLabel.text = formatClockTime(now)
         dateLabel.text = SimpleDateFormat(
             "EEEE  ·  d MMMM yyyy",
             Locale.getDefault()
@@ -1410,131 +1375,5 @@ class PhantomLockActivity : Activity() {
             }
         }
         super.onDestroy()
-    }
-}
-
-
-/**
- * Samsung-inspired edge lighting for Phantom's always-on display.
- *
- * A fine multicolour line traces the display perimeter while a brighter,
- * shorter runner continuously travels around the same path.
- */
-private class PhantomEdgeLightingView(context: Context) : View(context) {
-    private val density = resources.displayMetrics.density
-    private val edgePoints = PhantomEdgeShape.load(context)
-    private val edgeThickness = PhantomEdgeShape.loadThickness(context)
-    private val perimeter = Path()
-    private val runner = Path()
-    private val measure = PathMeasure()
-    private val bounds = RectF()
-    private val shaderMatrix = Matrix()
-    private val rainbowColors = intArrayOf(
-        0xFFFF315A.toInt(),
-        0xFFFF8A24.toInt(),
-        0xFFFFD84A.toInt(),
-        0xFF55E58A.toInt(),
-        0xFF35D9F2.toInt(),
-        0xFF477BFF.toInt(),
-        0xFFB65CFF.toInt(),
-        0xFFFF315A.toInt()
-    )
-    private var rainbow: SweepGradient? = null
-
-    private val ambientPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-        strokeWidth = 0.675f * edgeThickness * density
-        alpha = 175
-    }
-    private val runnerGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-        strokeWidth = 2.75f * edgeThickness * density
-        alpha = 105
-    }
-    private val runnerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-        strokeWidth = 0.95f * edgeThickness * density
-    }
-
-    private var progress = 0f
-    private var animator: ValueAnimator? = null
-
-    init {
-        setLayerType(LAYER_TYPE_SOFTWARE, null)
-        isClickable = false
-        isFocusable = false
-        contentDescription = "Animated edge lighting following your custom screen outline"
-    }
-
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
-        if (w <= 0 || h <= 0) return
-        val shader = SweepGradient(w / 2f, h / 2f, rainbowColors, null)
-        rainbow = shader
-        ambientPaint.shader = shader
-        runnerGlowPaint.shader = shader
-        runnerPaint.shader = shader
-    }
-
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        animator?.cancel()
-        animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 3_600L
-            repeatCount = ValueAnimator.INFINITE
-            interpolator = LinearInterpolator()
-            addUpdateListener {
-                progress = it.animatedValue as Float
-                invalidate()
-            }
-            start()
-        }
-    }
-
-    override fun onDetachedFromWindow() {
-        animator?.cancel()
-        animator = null
-        super.onDetachedFromWindow()
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-        if (width <= 0 || height <= 0) return
-
-        // The editor stores normalized points, so this exact contour scales to
-        // the real display without depending on Android's cutout reporting.
-        val inset = 2.5f * density
-        bounds.set(inset, inset, width - inset, height - inset)
-        PhantomEdgeShape.writePath(edgePoints, bounds, perimeter)
-
-        measure.setPath(perimeter, false)
-        val totalLength = measure.length
-        if (totalLength <= 0f) return
-
-        shaderMatrix.setRotate(progress * 360f, width / 2f, height / 2f)
-        rainbow?.setLocalMatrix(shaderMatrix)
-        canvas.drawPath(perimeter, ambientPaint)
-
-        // The travelling runner follows the user-defined outline, including
-        // the manually shaped waterdrop notch and all four screen edges.
-        val runnerLength = totalLength * 0.105f
-        val start = progress * totalLength
-        val end = start + runnerLength
-        runner.reset()
-        if (end <= totalLength) {
-            measure.getSegment(start, end, runner, true)
-        } else {
-            measure.getSegment(start, totalLength, runner, true)
-            measure.getSegment(0f, end - totalLength, runner, true)
-        }
-
-        canvas.drawPath(runner, runnerGlowPaint)
-        canvas.drawPath(runner, runnerPaint)
     }
 }
