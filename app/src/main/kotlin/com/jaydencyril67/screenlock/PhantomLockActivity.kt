@@ -30,7 +30,6 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.net.Uri
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -71,14 +70,6 @@ class PhantomLockActivity : Activity() {
     private lateinit var dateLabel: TextView
     private lateinit var batteryLabel: TextView
     private lateinit var fingerprintHint: TextView
-    private lateinit var mediaContainer: LinearLayout
-    private lateinit var mediaTitle: TextView
-    private lateinit var mediaArtwork: ImageView
-    private lateinit var mediaSubtitle: TextView
-    private lateinit var mediaPlayPause: ImageView
-    private lateinit var mediaPrevious: ImageView
-    private lateinit var mediaNext: ImageView
-    private lateinit var mediaChoose: TextView
     private var fingerprintView: ImageView? = null
     private var externalShortcutLaunched = false
     private var flashEnabled = false
@@ -126,7 +117,7 @@ class PhantomLockActivity : Activity() {
                     }
                 }
 
-                PhantomMediaListenerService.ACTION_STATE_CHANGED -> refreshDynamicContent()
+                
 
                 PhantomOverlayService.ACTION_CLOSE_LOCK -> {
                     armed = false
@@ -492,168 +483,6 @@ class PhantomLockActivity : Activity() {
             }
         )
 
-        val contentStack = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.TOP
-            clipChildren = false
-            clipToPadding = false
-        }
-
-        mediaContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = dp(20).toFloat()
-                setColor(0xC9141820.toInt())
-                setStroke(dp(1), 0x28FFFFFF)
-            }
-            visibility = View.GONE
-            setPadding(dp(13), dp(12), dp(13), dp(10))
-            clipToOutline = true
-        }
-
-        val mediaMainRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        mediaArtwork = ImageView(this).apply {
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            background = GradientDrawable().apply {
-                cornerRadius = dp(13).toFloat()
-                setColor(0xFF242A35.toInt())
-            }
-            clipToOutline = true
-            contentDescription = "Album artwork"
-        }
-        mediaMainRow.addView(
-            mediaArtwork,
-            LinearLayout.LayoutParams(dp(62), dp(62)).apply { marginEnd = dp(13) }
-        )
-        val mediaTextColumn = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        mediaTitle = TextView(this).apply {
-            textSize = 16f
-            setTextColor(0xFFFFF9F0.toInt())
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            includeFontPadding = false
-            maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
-        }
-        mediaSubtitle = TextView(this).apply {
-            textSize = 11f
-            setTextColor(0xFFC4BBAF.toInt())
-            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-            includeFontPadding = false
-            maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
-        }
-        mediaTextColumn.addView(
-            mediaTitle,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(23)
-            )
-        )
-        mediaTextColumn.addView(
-            mediaSubtitle,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(19)
-            )
-        )
-        mediaMainRow.addView(
-            mediaTextColumn,
-            LinearLayout.LayoutParams(0, dp(62), 1f)
-        )
-        mediaContainer.addView(
-            mediaMainRow,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(66)
-            )
-        )
-
-        val mediaControls = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(8), 0, 0)
-        }
-        mediaPrevious = mediaControl("previous", "Previous track") {
-            sendMusicCommand(PhantomMediaListenerService.COMMAND_PREVIOUS)
-        }
-        mediaPlayPause = mediaControl("play", "Play or pause") {
-            sendMusicCommand(PhantomMediaListenerService.COMMAND_PLAY_PAUSE)
-        }
-        mediaNext = mediaControl("next", "Next track") {
-            sendMusicCommand(PhantomMediaListenerService.COMMAND_NEXT)
-        }
-        mediaControls.addView(mediaPrevious, LinearLayout.LayoutParams(dp(42), dp(42)))
-        mediaControls.addView(mediaPlayPause, LinearLayout.LayoutParams(dp(48), dp(48)).apply {
-            marginStart = dp(7)
-            marginEnd = dp(7)
-        })
-        mediaControls.addView(mediaNext, LinearLayout.LayoutParams(dp(42), dp(42)))
-        mediaControls.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        mediaContainer.addView(
-            mediaControls,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                dp(50)
-            )
-        )
-
-        mediaChoose = TextView(this).apply {
-            text = "MEDIA ACCESS"
-            textSize = 9f
-            letterSpacing = 0.08f
-            setTextColor(0xFFE4C49A.toInt())
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            includeFontPadding = false
-            setPadding(dp(10), dp(7), dp(10), dp(7))
-            gravity = Gravity.CENTER_VERTICAL or Gravity.CENTER_HORIZONTAL
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = dp(10).toFloat()
-                setColor(Color.TRANSPARENT)
-            }
-            isClickable = true
-            isFocusable = true
-            contentDescription = "Enable access to local music controls"
-            setOnClickListener { openMediaAccessSettings() }
-        }
-        mediaContainer.addView(
-            mediaChoose,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                dp(30)
-            ).apply {
-                topMargin = dp(2)
-                gravity = Gravity.END
-            }
-        )
-        contentStack.addView(
-            mediaContainer,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        )
-
-        root.addView(
-            contentStack,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP or Gravity.START
-            ).apply {
-                topMargin = (resources.displayMetrics.heightPixels * 0.395f).toInt()
-                marginStart = dp(29)
-                marginEnd = dp(31)
-            }
-        )
-
         // The compact S20-scale fingerprint remains completely standalone, with no ring, tile,
         // plate, shadow or background behind it.
         val sensorStack = LinearLayout(this).apply {
@@ -781,114 +610,6 @@ class PhantomLockActivity : Activity() {
         setContentView(root)
         PhantomTypography.apply(root, this)
         updateClock()
-        refreshDynamicContent()
-    }
-
-    private fun mediaControl(
-        icon: String,
-        description: String,
-        action: () -> Unit
-    ): ImageView = ImageView(this).apply {
-        val isMain = description == "Play or pause"
-        val tint = if (isMain) 0xFF10131A.toInt() else 0xFFECE5DA.toInt()
-        setImageDrawable(MediaControlDrawable(icon, tint))
-        scaleType = ImageView.ScaleType.FIT_CENTER
-        setPadding(dp(11), dp(11), dp(11), dp(11))
-        contentDescription = description
-        background = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(if (isMain) 0xFFE8D3B4.toInt() else 0x1FFFFFFF)
-            if (!isMain) setStroke(dp(1), 0x24FFFFFF)
-        }
-        isClickable = true
-        isFocusable = true
-        setOnClickListener { action() }
-    }
-
-    private fun refreshDynamicContent() {
-        updateMediaContent()
-    }
-
-    private fun updateMediaContent() {
-        if (!::mediaContainer.isInitialized) return
-        val metadata = PhantomMediaListenerService.currentMetadata
-        val controller = PhantomMediaListenerService.activeController
-        val hasLocalTrack = metadata != null && controller != null
-
-        mediaContainer.visibility = View.VISIBLE
-        if (!hasLocalTrack) {
-            mediaTitle.text = "No local music playing"
-            mediaSubtitle.text = if (PhantomMediaListenerService.hasNotificationAccess(this)) {
-                "Play a song stored on this phone"
-            } else {
-                "Allow access to control local music"
-            }
-            mediaArtwork.setImageResource(R.drawable.ic_music_note)
-            mediaChoose.text = if (PhantomMediaListenerService.hasNotificationAccess(this)) {
-                "WAITING FOR LOCAL MUSIC"
-            } else {
-                "ENABLE MEDIA ACCESS"
-            }
-        } else {
-            mediaTitle.text = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE)
-                ?.takeIf { it.isNotBlank() } ?: "Unknown track"
-            val artist = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST)
-                ?: metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ARTIST)
-                ?: "LOCAL AUDIO"
-            mediaSubtitle.text = artist
-            mediaChoose.text = "LOCAL MUSIC"
-            val artwork = metadata?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART)
-                ?: metadata?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ART)
-            if (artwork != null) mediaArtwork.setImageBitmap(artwork)
-            else mediaArtwork.setImageResource(R.drawable.ic_music_note)
-        }
-
-        val playing = PhantomMediaListenerService.isPlaying
-        mediaPrevious.isEnabled = hasLocalTrack
-        mediaPrevious.alpha = if (hasLocalTrack) 1f else 0.35f
-        mediaPlayPause.isEnabled = hasLocalTrack
-        mediaPlayPause.alpha = if (hasLocalTrack) 1f else 0.35f
-        mediaNext.isEnabled = hasLocalTrack
-        mediaNext.alpha = if (hasLocalTrack) 1f else 0.35f
-        mediaPlayPause.setImageDrawable(
-            MediaControlDrawable(if (playing) "pause" else "play", 0xFF10131A.toInt())
-        )
-    }
-
-    private fun sendMusicCommand(command: String) {
-        if (PhantomMediaListenerService.sendCommand(command)) return
-        updateMediaContent()
-        android.widget.Toast.makeText(
-            this,
-            "No local music session is active.",
-            android.widget.Toast.LENGTH_SHORT
-        ).show()
-    }
-
-    private fun openMediaAccessSettings() {
-        if (PhantomMediaListenerService.hasNotificationAccess(this)) {
-            updateMediaContent()
-            return
-        }
-        externalShortcutLaunched = true
-        try {
-            startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-        } catch (_: Exception) {
-            externalShortcutLaunched = false
-            android.widget.Toast.makeText(
-                this,
-                "Could not open Notification Access settings.",
-                android.widget.Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (::mediaContainer.isInitialized) {
-            PhantomMediaListenerService.refreshSessions(this)
-            updateMediaContent()
-        }
     }
 
     private fun shortcutButton(
@@ -1219,7 +940,6 @@ class PhantomLockActivity : Activity() {
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(PhantomOverlayService.ACTION_CLOSE_LOCK)
-            addAction(PhantomMediaListenerService.ACTION_STATE_CHANGED)
         }
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(screenOffReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -1304,66 +1024,4 @@ class PhantomLockActivity : Activity() {
         }
         super.onDestroy()
     }
-}
-
-/**
- * Small Material-style vector controls for the lockscreen media player.
- * Drawn locally so the buttons use real interface icons, never emoji glyphs.
- */
-private class MediaControlDrawable(
-    private val icon: String,
-    private val tint: Int
-) : android.graphics.drawable.Drawable() {
-    private val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = tint
-        style = android.graphics.Paint.Style.FILL
-    }
-
-    override fun draw(canvas: android.graphics.Canvas) {
-        val b = bounds
-        if (b.isEmpty) return
-        val save = canvas.save()
-        canvas.translate(b.left.toFloat(), b.top.toFloat())
-        canvas.scale(b.width() / 24f, b.height() / 24f)
-        when (icon) {
-            "previous" -> {
-                canvas.drawRect(4f, 5f, 6.5f, 19f, paint)
-                val p = android.graphics.Path().apply {
-                    moveTo(19f, 5f); lineTo(8f, 12f); lineTo(19f, 19f); close()
-                }
-                canvas.drawPath(p, paint)
-            }
-            "next" -> {
-                canvas.drawRect(17.5f, 5f, 20f, 19f, paint)
-                val p = android.graphics.Path().apply {
-                    moveTo(5f, 5f); lineTo(16f, 12f); lineTo(5f, 19f); close()
-                }
-                canvas.drawPath(p, paint)
-            }
-            "pause" -> {
-                canvas.drawRoundRect(6f, 4.5f, 10f, 19.5f, 1f, 1f, paint)
-                canvas.drawRoundRect(14f, 4.5f, 18f, 19.5f, 1f, 1f, paint)
-            }
-            else -> {
-                val p = android.graphics.Path().apply {
-                    moveTo(7f, 4.5f); lineTo(19f, 12f); lineTo(7f, 19.5f); close()
-                }
-                canvas.drawPath(p, paint)
-            }
-        }
-        canvas.restoreToCount(save)
-    }
-
-    override fun setAlpha(alpha: Int) {
-        paint.alpha = alpha
-        invalidateSelf()
-    }
-
-    override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) {
-        paint.colorFilter = colorFilter
-        invalidateSelf()
-    }
-
-    @Deprecated("Deprecated in Android")
-    override fun getOpacity(): Int = android.graphics.PixelFormat.TRANSLUCENT
 }
