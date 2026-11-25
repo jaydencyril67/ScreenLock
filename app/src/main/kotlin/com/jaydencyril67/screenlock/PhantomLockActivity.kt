@@ -20,6 +20,7 @@ import android.os.Bundle
 import android.os.CancellationSignal
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -35,8 +36,8 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Full-screen lock surface. The S20-scale fingerprint artwork remains the same
- * touch target and retains its existing one-use arm and biometric behavior.
+ * Full-screen lock surface. The fingerprint artwork accepts a two-group tap code;
+ * the existing hold threshold, biometric path, and mismatch feedback remain intact.
  */
 class PhantomLockActivity : Activity() {
 
@@ -45,6 +46,8 @@ class PhantomLockActivity : Activity() {
         private const val CAMERA_ACTION_NONE = 0
         private const val CAMERA_ACTION_FLASH = 1
         private const val CAMERA_ACTION_OPEN_CAMERA = 2
+        private const val FINGERPRINT_HOLD_MS = 500L
+        private const val TAP_GROUP_GAP_MS = 400L
         const val ACTION_PREPARE = "com.jaydencyril67.screenlock.action.PREPARE_LOCK"
         const val ACTION_AOD_SHOW = "com.jaydencyril67.screenlock.action.AOD_SHOW"
         const val ACTION_WAKE = "com.jaydencyril67.screenlock.action.WAKE_LOCK"
@@ -60,11 +63,20 @@ class PhantomLockActivity : Activity() {
     }
 
     private val handler = Handler(Looper.getMainLooper())
-    private var armed = false
     private var authenticating = false
     private var unlockPending = false
     private var receiverRegistered = false
-    private var armRunnable: Runnable? = null
+
+    private var fingerprintTouchActive = false
+    private var fingerprintTouchStartedAt = 0L
+    private var fingerprintHoldTriggered = false
+    private var fingerprintHoldRunnable: Runnable? = null
+
+    private var firstTapCount = 0
+    private var secondTapCount = 0
+    private var tapGroup = 0
+    private var tapSequenceInvalid = false
+    private var lastTapAt = 0L
 
     private lateinit var clockLabel: TextView
     private lateinit var dateLabel: TextView
@@ -105,10 +117,9 @@ class PhantomLockActivity : Activity() {
                 Intent.ACTION_SCREEN_OFF -> {
                     // Reset any in-progress unlock gesture. The foreground service
                     // owns the AOD session and starts the visible AOD Activity.
-                    armed = false
                     unlockPending = false
-                    armRunnable?.let(handler::removeCallbacks)
-                    armRunnable = null
+                    cancelFingerprintTouch()
+                    resetTapCodeProgress()
                     handler.removeCallbacks(clearMismatch)
                     if (::fingerprintHint.isInitialized) {
                         fingerprintHint.text = ""
@@ -120,9 +131,9 @@ class PhantomLockActivity : Activity() {
                 
 
                 PhantomOverlayService.ACTION_CLOSE_LOCK -> {
-                    armed = false
                     unlockPending = false
-                    armRunnable?.let(handler::removeCallbacks)
+                    cancelFingerprintTouch()
+                    resetTapCodeProgress()
                     finish()
                 }
             }
@@ -189,19 +200,19 @@ class PhantomLockActivity : Activity() {
             return
         }
         if (aodShow) {
-            armed = false
             unlockPending = false
             authenticating = false
-            armRunnable?.let(handler::removeCallbacks)
+            cancelFingerprintTouch()
+            resetTapCodeProgress()
             handler.removeCallbacks(clearMismatch)
             buildAodScreen()
             applyImmersiveMode()
             return
         }
-        armed = false
         unlockPending = false
         authenticating = false
-        armRunnable?.let(handler::removeCallbacks)
+        cancelFingerprintTouch()
+        resetTapCodeProgress()
         handler.removeCallbacks(clearMismatch)
         if (::fingerprintHint.isInitialized) {
             fingerprintHint.text = ""
@@ -300,10 +311,7 @@ class PhantomLockActivity : Activity() {
             gravity = Gravity.CENTER
             includeFontPadding = false
             setTextColor(0xFFAAA398.toInt())
-            isClickable = true
-            isFocusable = true
-            contentDescription = "Tap to arm fingerprint unlock"
-            setOnClickListener { armFingerprint() }
+            contentDescription = "Battery percentage"
         }
         root.addView(
             battery,
@@ -314,17 +322,13 @@ class PhantomLockActivity : Activity() {
             ).apply { bottomMargin = dp(8) }
         )
 
-        // Use the same fingerprint artwork, half-second hold and biometric
-        // authentication path as the full Phantom lockscreen.
+        // Use the same tap-code and hold-to-attempt path as the full Phantom lockscreen.
         val aodSensorStack = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             clipChildren = false
             clipToPadding = false
         }
-        var aodFingerprintTouchActive = false
-        var aodFingerprintStartedArmed = false
-        var aodFingerprintHold: Runnable? = null
         val aodFingerprint = ImageView(this).apply {
             setImageResource(R.drawable.ic_s20_fingerprint)
             scaleType = ImageView.ScaleType.FIT_CENTER
@@ -334,34 +338,7 @@ class PhantomLockActivity : Activity() {
             isClickable = true
             isFocusable = true
             contentDescription = "Fingerprint"
-            setOnTouchListener { view, event ->
-                when (event.actionMasked) {
-                    android.view.MotionEvent.ACTION_DOWN -> {
-                        aodFingerprintTouchActive = true
-                        aodFingerprintStartedArmed = armed
-                        if (!authenticating && !unlockPending) {
-                            val hold = Runnable {
-                                if (aodFingerprintTouchActive &&
-                                    armed == aodFingerprintStartedArmed &&
-                                    !authenticating && !unlockPending
-                                ) onFingerprintPressed()
-                            }
-                            aodFingerprintHold = hold
-                            handler.postDelayed(hold, 500L)
-                        }
-                        true
-                    }
-                    android.view.MotionEvent.ACTION_UP,
-                    android.view.MotionEvent.ACTION_CANCEL -> {
-                        aodFingerprintTouchActive = false
-                        aodFingerprintHold?.let(handler::removeCallbacks)
-                        aodFingerprintHold = null
-                        view.isPressed = false
-                        true
-                    }
-                    else -> true
-                }
-            }
+            bindFingerprintTouch(this)
         }
         fingerprintView = aodFingerprint
         aodSensorStack.addView(
@@ -416,7 +393,7 @@ class PhantomLockActivity : Activity() {
         )
 
         // Match the AOD battery indicator: centred, low on the screen,
-        // with identical typography, colour and bottom spacing.
+        // with identical typography, colour and bottom spacing. It is display-only.
         batteryLabel = TextView(this).apply {
             text = readBatteryPercent()
             textSize = 10f
@@ -425,10 +402,7 @@ class PhantomLockActivity : Activity() {
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             gravity = Gravity.CENTER
             includeFontPadding = false
-            isClickable = true
-            isFocusable = true
-            contentDescription = "Tap to arm fingerprint unlock"
-            setOnClickListener { armFingerprint() }
+            contentDescription = "Battery percentage"
         }
         root.addView(
             batteryLabel,
@@ -491,10 +465,6 @@ class PhantomLockActivity : Activity() {
             clipChildren = false
             clipToPadding = false
         }
-        var fingerprintTouchStartedArmed = false
-        var fingerprintTouchActive = false
-        var fingerprintHoldRunnable: Runnable? = null
-
         val fingerprint = ImageView(this).apply {
             setImageResource(R.drawable.ic_s20_fingerprint)
             scaleType = ImageView.ScaleType.FIT_CENTER
@@ -503,46 +473,7 @@ class PhantomLockActivity : Activity() {
             contentDescription = "Fingerprint"
             isClickable = true
             isFocusable = true
-            setOnTouchListener { view, event ->
-                when (event.actionMasked) {
-                    android.view.MotionEvent.ACTION_DOWN -> {
-                        fingerprintTouchActive = true
-                        fingerprintTouchStartedArmed = armed
-
-                        if (!authenticating && !unlockPending) {
-                            // Both armed and unarmed touches use the same continuous
-                            // half-second hold. The result is evaluated only at the threshold:
-                            // armed = unlock; unarmed = mismatch.
-                            val hold = Runnable {
-                                if (fingerprintTouchActive &&
-                                    armed == fingerprintTouchStartedArmed &&
-                                    !authenticating && !unlockPending
-                                ) {
-                                    onFingerprintPressed()
-                                }
-                            }
-                            fingerprintHoldRunnable = hold
-                            handler.postDelayed(hold, 500L)
-                        }
-                        true
-                    }
-                    android.view.MotionEvent.ACTION_UP -> {
-                        fingerprintTouchActive = false
-                        fingerprintHoldRunnable?.let(handler::removeCallbacks)
-                        fingerprintHoldRunnable = null
-                        view.isPressed = false
-                        true
-                    }
-                    android.view.MotionEvent.ACTION_CANCEL -> {
-                        fingerprintTouchActive = false
-                        fingerprintHoldRunnable?.let(handler::removeCallbacks)
-                        fingerprintHoldRunnable = null
-                        view.isPressed = false
-                        true
-                    }
-                    else -> true
-                }
-            }
+            bindFingerprintTouch(this)
         }
         fingerprintView = fingerprint
         sensorStack.addView(
@@ -767,33 +698,135 @@ class PhantomLockActivity : Activity() {
         }
     }
 
-    private fun armFingerprint() {
-        // Battery tap arms the fingerprint immediately; the only detection timer
-        // is the half-second continuous press-and-hold on the fingerprint.
-        armRunnable?.let(handler::removeCallbacks)
-        armRunnable = null
-        armed = true
-        unlockPending = false
-        handler.removeCallbacks(clearMismatch)
+    private fun bindFingerprintTouch(view: ImageView) {
+        view.setOnTouchListener { touchedView, event ->
+            when (event.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    if (authenticating || unlockPending) return@setOnTouchListener true
 
-        if (::fingerprintHint.isInitialized) {
-            fingerprintHint.text = ""
-            fingerprintHint.setTextColor(0xFFE3DCD1.toInt())
-            fingerprintHint.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
+                    fingerprintTouchActive = true
+                    fingerprintTouchStartedAt = SystemClock.uptimeMillis()
+                    fingerprintHoldTriggered = false
+                    fingerprintHoldRunnable?.let(handler::removeCallbacks)
+
+                    val hold = Runnable {
+                        if (fingerprintTouchActive && !authenticating && !unlockPending) {
+                            fingerprintHoldTriggered = true
+                            onFingerprintPressed()
+                        }
+                    }
+                    fingerprintHoldRunnable = hold
+                    handler.postDelayed(hold, FINGERPRINT_HOLD_MS)
+                    true
+                }
+
+                android.view.MotionEvent.ACTION_UP -> {
+                    val wasActive = fingerprintTouchActive
+                    val heldFor = SystemClock.uptimeMillis() - fingerprintTouchStartedAt
+                    fingerprintTouchActive = false
+                    fingerprintHoldRunnable?.let(handler::removeCallbacks)
+                    fingerprintHoldRunnable = null
+                    touchedView.isPressed = false
+
+                    if (wasActive && !fingerprintHoldTriggered) {
+                        if (heldFor >= FINGERPRINT_HOLD_MS) {
+                            // A delayed main-thread callback must not turn a real hold into a tap.
+                            fingerprintHoldTriggered = true
+                            onFingerprintPressed()
+                        } else if (!authenticating && !unlockPending) {
+                            recordQuickFingerprintTap()
+                        }
+                    }
+                    fingerprintHoldTriggered = false
+                    true
+                }
+
+                android.view.MotionEvent.ACTION_CANCEL -> {
+                    fingerprintTouchActive = false
+                    fingerprintHoldRunnable?.let(handler::removeCallbacks)
+                    fingerprintHoldRunnable = null
+                    fingerprintHoldTriggered = false
+                    touchedView.isPressed = false
+                    true
+                }
+
+                else -> true
+            }
         }
     }
+
+    private fun recordQuickFingerprintTap() {
+        val now = SystemClock.uptimeMillis()
+
+        when {
+            lastTapAt == 0L -> {
+                tapGroup = 1
+                firstTapCount = 1
+            }
+
+            now - lastTapAt > TAP_GROUP_GAP_MS -> {
+                if (tapGroup == 1) {
+                    tapGroup = 2
+                    secondTapCount = 1
+                } else {
+                    tapGroup = 3
+                    tapSequenceInvalid = true
+                }
+            }
+
+            tapGroup == 1 -> firstTapCount++
+            tapGroup == 2 -> secondTapCount++
+            else -> tapSequenceInvalid = true
+        }
+
+        lastTapAt = now
+        if (firstTapCount > 5 || secondTapCount > 5) {
+            tapSequenceInvalid = true
+        }
+    }
+
+    private fun hasValidTapCode(): Boolean {
+        val settings = getSharedPreferences(PhantomOverlayService.PREFS, MODE_PRIVATE)
+        val expectedFirst = settings.getInt(
+            PhantomOverlayService.PREF_UNLOCK_TAP_COUNT_FIRST,
+            1
+        ).coerceIn(1, 5)
+        val expectedSecond = settings.getInt(
+            PhantomOverlayService.PREF_UNLOCK_TAP_COUNT_SECOND,
+            1
+        ).coerceIn(1, 5)
+
+        return !tapSequenceInvalid &&
+            tapGroup == 2 &&
+            firstTapCount == expectedFirst &&
+            secondTapCount == expectedSecond
+    }
+
+    private fun resetTapCodeProgress() {
+        firstTapCount = 0
+        secondTapCount = 0
+        tapGroup = 0
+        tapSequenceInvalid = false
+        lastTapAt = 0L
+    }
+
+    private fun cancelFingerprintTouch() {
+        fingerprintTouchActive = false
+        fingerprintHoldRunnable?.let(handler::removeCallbacks)
+        fingerprintHoldRunnable = null
+        fingerprintHoldTriggered = false
+    }
+
     private fun onFingerprintPressed() {
         if (authenticating || unlockPending) return
-        if (!armed) {
+
+        val codeMatches = hasValidTapCode()
+        resetTapCodeProgress()
+        if (!codeMatches) {
             showMismatch()
             return
         }
 
-        // This method is called by the half-second hold timer while the finger
-        // is still physically down. No ACTION_UP/release is needed.
-        armed = false
-        armRunnable?.let(handler::removeCallbacks)
-        armRunnable = null
         handler.removeCallbacks(clearMismatch)
         unlockPending = true
 
@@ -1005,8 +1038,8 @@ class PhantomLockActivity : Activity() {
     override fun onDestroy() {
         isAlive = false
         isAodVisible = false
+        cancelFingerprintTouch()
         handler.removeCallbacksAndMessages(null)
-        armRunnable = null
         if (flashEnabled) {
             try {
                 flashCameraId?.let {

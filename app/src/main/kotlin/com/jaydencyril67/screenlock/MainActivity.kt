@@ -26,6 +26,7 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.NumberPicker
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -124,6 +125,65 @@ class MainActivity : Activity() {
         }
         root.addView(section)
 
+        val tapUnlockTitle = label("TAP UNLOCK", 10f, 0xFF8296BC.toInt(), true).apply {
+            letterSpacing = 0.18f
+            setPadding(0, dp(8), 0, dp(8))
+        }
+        root.addView(tapUnlockTitle)
+
+        val tapUnlockCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            background = rounded(0xFF10182A.toInt(), 20f, 0xFF273653.toInt())
+        }
+
+        fun tapCountPicker(title: String, preferenceKey: String): LinearLayout {
+            val column = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+            }
+            column.addView(
+                label(title, 9f, 0xFF91A7D0.toInt(), true).apply {
+                    gravity = Gravity.CENTER
+                    letterSpacing = 0.08f
+                }
+            )
+            val picker = NumberPicker(this).apply {
+                minValue = 1
+                maxValue = 5
+                wrapSelectorWheel = false
+                value = prefs.getInt(preferenceKey, 1).coerceIn(1, 5)
+                setOnValueChangedListener { _, _, newValue ->
+                    prefs.edit().putInt(preferenceKey, newValue).apply()
+                }
+            }
+            column.addView(
+                picker,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(104)
+                )
+            )
+            return column
+        }
+
+        tapUnlockCard.addView(
+            tapCountPicker("FIRST GROUP", PhantomOverlayService.PREF_UNLOCK_TAP_COUNT_FIRST),
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        )
+        tapUnlockCard.addView(
+            tapCountPicker("SECOND GROUP", PhantomOverlayService.PREF_UNLOCK_TAP_COUNT_SECOND),
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        )
+        root.addView(
+            tapUnlockCard,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(18) }
+        )
+
         overlayButton = actionButton("ALLOW DISPLAY OVER OTHER APPS", 0xFF243B63.toInt())
         overlayButton.setOnClickListener { requestOverlayPermission() }
         root.addView(overlayButton, buttonParams())
@@ -211,7 +271,7 @@ class MainActivity : Activity() {
         root.addView(protectionButton, protectParams)
 
         val note = label(
-            "HOW IT WORKS\nPhantom starts its Wake AOD Activity when Android reports that the phone has locked. Your clock and date remain visible at normal system brightness. Press the power button again to turn the display fully off; waking the phone returns to the interactive Phantom lockscreen. Because the Galaxy A02 uses an LCD, the backlight remains on during AOD and battery use can be significant.\n\nA small padlock silently arms one fingerprint tap. An ordinary fingerprint tap displays “Fingerprint doesn't match” with haptic feedback. On phones with enrolled fingerprint hardware, Android's genuine biometric prompt is used. The Galaxy A02 has no fingerprint reader, so its armed tap is a visual unlock gesture.\n\n" +
+            "HOW IT WORKS\nPhantom starts its Wake AOD Activity when Android reports that the phone has locked. Your clock and date remain visible at normal system brightness. Press the power button again to turn the display fully off; waking the phone returns to the interactive Phantom lockscreen. Because the Galaxy A02 uses an LCD, the backlight remains on during AOD and battery use can be significant.\n\n" +
                 "LOCAL MUSIC\nChoose audio files stored on your phone. Phantom plays those selected tracks directly, with previous, play/pause and next controls. It does not need notification-listener access and does not read or display your notifications.",
             12f,
             0xFF8793AD.toInt(),
@@ -221,18 +281,6 @@ class MainActivity : Activity() {
             setLineSpacing(dp(5).toFloat(), 1f)
         }
         root.addView(note)
-
-        val foot = label(
-            "ONE TAP TO FAIL  ·  PADLOCK TO ARM  ·  ONE TAP TO OPEN",
-            9f,
-            0xFF596985.toInt(),
-            true
-        ).apply {
-            letterSpacing = 0.05f
-            setPadding(0, dp(24), 0, 0)
-            gravity = Gravity.CENTER
-        }
-        root.addView(foot)
 
         refreshDashboard()
     }

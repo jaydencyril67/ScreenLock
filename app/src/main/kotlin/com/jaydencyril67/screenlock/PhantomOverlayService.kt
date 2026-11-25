@@ -25,6 +25,8 @@ class PhantomOverlayService : Service() {
         const val PREFS = "phantom_lock_settings"
         const val PREF_ENABLED = "protection_enabled"
         const val PREF_AOD_MODE = "aod_mode"
+        const val PREF_UNLOCK_TAP_COUNT_FIRST = "unlock_tap_count_first"
+        const val PREF_UNLOCK_TAP_COUNT_SECOND = "unlock_tap_count_second"
         const val AOD_MODE_WAKE = "wake"
 
         private const val TAG = "PhantomLock"
