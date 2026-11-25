@@ -332,6 +332,7 @@ jobs:
 
       - name: Notify ApiCrownStore about the published APK release
         if: ${{ always() && steps.publish_release.outcome == 'success' }}
+        continue-on-error: true
         env:
           API_URL: ${{ vars.CROWNSTORE_API_URL || 'https://apicrownstore.kingshall.online' }}
           APP_VERSION: ${{ steps.version.outputs.app_version }}
@@ -365,5 +366,5 @@ jobs:
             if [ "$attempt" -lt 5 ]; then sleep 10; fi
           done
 
-          echo "::error::The GitHub release exists, but ApiCrownStore synchronization failed after 5 attempts."
+          echo "::warning::The GitHub release was published, but ApiCrownStore did not acknowledge synchronization after 5 attempts. The store can recover through startup reconciliation or Publisher manual sync."
           exit 1
